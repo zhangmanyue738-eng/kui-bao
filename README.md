@@ -70,6 +70,18 @@ node src/interpret.js 2000-8-16 14 男 深圳 career,wealth,marriage   # CLI 单
 | badcase 反馈回路 | ✅ 已完成 | 前端按钮 → `POST /api/feedback` → `data/feedback.jsonl` |
 | 互证合成接入 | ✅ 已完成 | `src/synthesize.js`（简化喜用神+五大领域取证规则+S1-S3合成）；报告含【置信度】行；前端互证标签 |
 | 排盘准确性验证 | ✅ 已完成 | `src/verify-chart.js`（3006 盘/38873 项，100%）+ `src/cross-check.js`（跨实现对拍 8000 字段，100%）；报告 `docs/chart-accuracy-2026-08-30.md` |
+| 八字知识库（补齐双术短板） | ✅ 已完成 | 知识库 68→596 条（紫微 68 + 八字 528）；每条带 `tradition`(bazi/ziwei) 与 `license`(public_domain/modern)，对外可一键剔除 modern |
+| 调候用神 + 从格/专旺防误判 | ✅ 已完成 | 穷通宝鉴调候表结构化（120 条）；从格粗判（专旺≥0.78/从弱≤0.13，命中 4.7%）→ 压置信度+提示复核 |
+| 输出三类硬门禁 | ✅ 已完成 | 出处合法 / 禁止词 / 置信度不得调级；最多三轮重生成，仍不过则**拦截不输出** |
+| 定盘（时辰校准） | ✅ 已完成 | src/rectify.js：紫微大限区分 + 信息增益选题 + 贝叶斯收敛；自洽性验证 14/15 命中、平均 4 题；设计说明 docs/rectification-notes.md |
+| 稳定性测试 | ✅ 已完成 | `src/stability.js`：同盘 3 次，档位种类一致率 100%、出处 0 违规、禁止词 0 命中 |
+
+## 知识库与版权
+
+- 来源：`knowledge/ziwei-doushu`（紫微）+ `knowledge/bazi-classics`（八字，源自 stephenxu007-ux/bazi-destiny-master）
+- 每条带 `license` 标签：**public_domain**（古籍原文，48 条）/ **modern**（现代整理与断语，548 条）
+- **自用**：两者都用；**对外发布前**必须切到公版模式（检索传 `{ publicOnly: true }`）
+- 重建：`node src/build-kb.js`；调候表：`node src/extract-tiaohou.js`
 
 ## 排盘准确性门禁
 

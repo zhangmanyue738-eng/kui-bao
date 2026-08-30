@@ -41,6 +41,8 @@
   .report th, .report td { border: 1px solid var(--line); padding: 8px 10px; font-size: 14px; text-align: left; }
   .fb-btn { padding: 6px 18px; margin: 0 4px; border: 1px solid var(--line); border-radius: 999px; background: #fdfcfa; font-size: 14px; cursor: pointer; font-family: inherit; }
   .fb-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .opt-btn { padding: 11px 16px; border: 1px solid var(--line); border-radius: 8px; background: #fdfcfa; font-size: 14px; cursor: pointer; font-family: inherit; text-align: left; }
+  .opt-btn:hover { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
   .conf-chip { display: inline-block; padding: 3px 12px; margin: 4px 6px 0 0; border-radius: 999px; font-size: 13px; border: 1px solid var(--line); background: #fdfcfa; }
   .conf-chip.high { background: #eef4ea; border-color: #b7cfab; color: #4a6b3a; }
   .conf-chip.medium { background: #f7f1e6; border-color: #ddc9a3; color: #8a6d2f; }
@@ -67,7 +69,8 @@
       <div class="field">
         <label>出生时辰（不确定选「未知」）</label>
         <select id="hour">
-          <option value="">未知（降级为三柱解读）</option>
+          <option value="rectify">不确定 / 帮我定盘（回答几个问题推算）</option>
+          <option value="">未知（直接按三柱解读）</option>
           <option value="0">子时 00-01</option><option value="1">丑时 01-03</option>
           <option value="2">寅时 03-05</option><option value="3">卯时 05-07</option>
           <option value="4">辰时 07-09</option><option value="5">巳时 09-11</option>
@@ -112,6 +115,93 @@ document.getElementById('cities').innerHTML = CITIES.map(c => `<option value="${
 document.getElementById('date').value = '1995-06-15';
 
 function esc(s){ const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML; }
+
+// ───────── 定盘流程 ─────────
+let rectifyState = null; // { sessionId, question, done, result }
+
+function renderRectify() {
+  const result = document.getElementById('result');
+  const st = rectifyState;
+  if (st.done) {
+    const r = st.result;
+    const color = r.level === 'high' ? 'high' : r.level === 'medium' ? 'medium' : 'conditional';
+    result.innerHTML = `<div class="card">
+      <h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:8px">定盘结果</h3>
+      <p style="font-size:22px;font-weight:600;letter-spacing:2px">${r.hour} 时左右</p>
+      <p style="margin-top:6px"><span class="conf-chip ${color}">把握 ${(r.posterior * 100).toFixed(0)}%　用了 ${r.questionsUsed} 个问题</span></p>
+      <p style="font-size:13px;color:var(--muted);margin-top:10px">${esc(r.note)}</p>
+      ${r.runnerUp ? `<p style="font-size:12px;color:var(--muted)">次选：${r.runnerUp.hour} 时（${(r.runnerUp.posterior * 100).toFixed(0)}%）</p>` : ''}
+      <button class="btn" style="margin-top:20px" onclick="startInterpret(${r.hour})">按此时辰开始解读</button>
+      <button class="btn" style="margin-top:10px;background:#8a8175" onclick="startInterpret(null)">仍按「时辰未知」解读</button>
+    </div>`;
+    return;
+  }
+  const q = st.question;
+  let opts = '';
+  if (q.type === 'decadal') {
+    opts = q.topicOptions.map(o =>
+      `<button class="opt-btn" onclick="answerRectify('${o.key}')">${esc(o.label)}</button>`).join('');
+  } else {
+    opts = `<button class="opt-btn" onclick="answerRectify('yes')">有</button>
+            <button class="opt-btn" onclick="answerRectify('no')">没有</button>
+            <button class="opt-btn" onclick="answerRectify('unsure')">记不清</button>`;
+  }
+  const bar = st.posterior.slice(0, 4).map(p =>
+    `<span class="conf-chip">${esc(p.label)} ${(p.posterior * 100).toFixed(0)}%</span>`).join('');
+  result.innerHTML = `<div class="card">
+    <h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:4px">定盘（推算出生时辰）</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">
+      出生时辰决定命宫，紫微十二宫随之全部重排。通过你过往的真实经历反推，比直接回忆更可靠。
+      ${st.qCount ? `已回答 ${st.qCount} 题` : ''}
+    </p>
+    <p style="font-size:17px;margin-bottom:16px;line-height:1.8">${esc(q.text)}</p>
+    <div style="display:flex;flex-direction:column;gap:8px">${opts}</div>
+    <div style="margin-top:18px;border-top:1px dashed var(--line);padding-top:12px">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:6px">当前推算倾向：</p>${bar}
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:14px">都不符合也没关系——这恰恰说明此盘与你的经历吻合度低，我们会据此下调结论的把握。</p>
+  </div>`;
+}
+
+async function answerRectify(ans) {
+  const result = document.getElementById('result');
+  result.innerHTML = '<div class="card status">推算中…</div>';
+  const resp = await fetch('/api/rectify/answer', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: rectifyState.sessionId, question: rectifyState.question, answer: ans }),
+  });
+  const data = await resp.json();
+  if (data.error) { result.innerHTML = `<div class="card err">${esc(data.error)}</div>`; return; }
+  rectifyState = { ...rectifyState, ...data, qCount: data.asked };
+  renderRectify();
+}
+
+async function startRectify(payload) {
+  const result = document.getElementById('result');
+  result.innerHTML = '<div class="card status">正在生成定盘问题…</div>';
+  const resp = await fetch('/api/rectify/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dateStr: payload.dateStr, gender: payload.gender, city: payload.city }),
+  });
+  const data = await resp.json();
+  if (data.error) { result.innerHTML = `<div class="card err">${esc(data.error)}</div>`; return; }
+  if (!data.question) {
+    result.innerHTML = `<div class="card err">可用于定盘的人生区间不足（年龄太小）。请直接选择时辰或按「未知」解读。</div>`;
+    return;
+  }
+  rectifyState = data;
+  window._rectifyPayload = payload;
+  renderRectify();
+}
+
+/** 定盘完成后（或跳过定盘）进入正式解读 */
+async function startInterpret(hour) {
+  const p = window._rectifyPayload;
+  await runInterpret({
+    dateStr: p.dateStr, hour, gender: p.gender, city: p.city,
+    domains: p.domains, rectified: hour != null,
+  });
+}
 function mdLite(t){
   let h = esc(t);
   h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h2>$1</h2>');
@@ -147,15 +237,23 @@ document.getElementById('go').addEventListener('click', async () => {
   const gender = document.getElementById('gender').value;
   const city = document.getElementById('city').value.trim();
   const domains = [...document.querySelectorAll('.domains input:checked')].map(i => i.value);
+  if (!date) { document.getElementById('result').innerHTML = '<div class="card err">请先选择出生日期</div>'; return; }
+  const payload = { dateStr: date, gender, city, domains };
+
+  // 时辰不确定 → 进入定盘问答流程
+  if (hourRaw === 'rectify') { window._rectifyPayload = payload; return startRectify(payload); }
+  await runInterpret({ ...payload, hour: hourRaw === '' ? null : Number(hourRaw) });
+});
+
+async function runInterpret({ dateStr, hour, gender, city, domains, rectified }) {
   const btn = document.getElementById('go');
   const result = document.getElementById('result');
-  if (!date) { result.innerHTML = '<div class="card err">请先选择出生日期</div>'; return; }
   btn.disabled = true;
   result.innerHTML = '<div class="card status">排盘中（确定性算法）→ AI 解读中（约 20-40 秒）…</div>';
   try {
     const resp = await fetch('/api/interpret', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dateStr: date, hour: hourRaw === '' ? null : Number(hourRaw), gender, city, domains })
+      body: JSON.stringify({ dateStr, hour: hour ?? null, gender, city, domains })
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
@@ -213,13 +311,13 @@ document.getElementById('go').addEventListener('click', async () => {
         </div>
       </div></div>`;
     result.innerHTML = html;
-    window._lastPayload = { input: { dateStr: date, hour: hourRaw === '' ? null : Number(hourRaw), gender, city, domains }, report: data.report };
+    window._lastPayload = { input: { dateStr, hour: hour ?? null, gender, city, domains, rectified: !!rectified }, report: data.report };
   } catch (e) {
     result.innerHTML = `<div class="card err">出错了：${esc(e.message)}</div>`;
   } finally {
     btn.disabled = false;
   }
-});
+}
 </script>
 </body>
 </html>

@@ -9,6 +9,15 @@ const path = require('path');
 const { buildChart } = require('./chart.js');
 const { synthesize } = require('./synthesize.js');
 const { interpret } = require('./interpret.js');
+const rect = require('./rectify.js');
+
+// 定盘会话（内存态，自用规模足够；重启即失效）
+const rectifySessions = new Map();
+const SESSION_TTL = 30 * 60 * 1000;
+function putSession(id, s) {
+  rectifySessions.set(id, { s, ts: Date.now() });
+  for (const [k, v] of rectifySessions) if (Date.now() - v.ts > SESSION_TTL) rectifySessions.delete(k);
+}
 
 const PORT = process.env.PORT || 3766;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -37,6 +46,58 @@ const server = http.createServer(async (req, res) => {
         fs.appendFileSync(path.join(__dirname, '..', 'data', 'feedback.jsonl'), JSON.stringify(record) + '\n');
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── 定盘：开始（返回第一个问题）
+  if (req.method === 'POST' && req.url === '/api/rectify/start') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    req.on('end', () => {
+      try {
+        const { dateStr, gender, city, knownHour, mode } = JSON.parse(body);
+        if (!dateStr) throw new Error('缺少出生日期');
+        const session = rect.createSession({
+          dateStr, gender: gender === '女' ? '女' : '男', city,
+          knownHour: knownHour ?? null, mode: mode || (knownHour != null ? 'refine' : 'full'),
+        });
+        const id = 'R' + Date.now() + Math.random().toString(36).slice(2, 6);
+        putSession(id, session);
+        const q = rect.nextQuestion(session);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          sessionId: id, candidates: session.candidates.length,
+          question: q, posterior: rect.posteriorView(session), done: session.done,
+        }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── 定盘：回答（推进或结束）
+  if (req.method === 'POST' && req.url === '/api/rectify/answer') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    req.on('end', () => {
+      try {
+        const { sessionId, question, answer } = JSON.parse(body);
+        const rec = rectifySessions.get(sessionId);
+        if (!rec) throw new Error('定盘会话已过期，请重新开始');
+        rect.answerQuestion(rec.s, question, answer);
+        const q = rect.nextQuestion(rec.s);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          done: rec.s.done, result: rec.s.result, question: q,
+          posterior: rect.posteriorView(rec.s), asked: rec.s.asked.length,
+        }));
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: e.message }));
