@@ -1,0 +1,188 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mingli-consultant/unified-chart",
+  "title": "统一排盘 JSON Schema（八字 + 紫微双排盘）",
+  "description": "排盘层唯一输出格式。时辰未知时 ziwei 走 skipped 分支；下游（互证合成/RAG/解读层）只依赖此 schema 字段。",
+  "type": "object",
+  "required": ["meta", "bazi", "ziwei"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["dateStr", "inputHour", "effectiveHour", "gender", "trueSolar", "generatedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "dateStr": { "type": "string", "pattern": "^\\d{4}-\\d{1,2}-\\d{1,2}$", "description": "公历出生日期" },
+        "inputHour": { "type": ["integer", "null"], "minimum": 0, "maximum": 23, "description": "用户输入时辰；未知为 null" },
+        "effectiveHour": { "type": ["integer", "null"], "description": "真太阳时校正后的时辰" },
+        "gender": { "enum": ["男", "女"] },
+        "city": { "type": ["string", "null"] },
+        "trueSolar": {
+          "type": ["object", "null"],
+          "required": ["hour", "adjusted", "boundaryRisk", "note"],
+          "properties": {
+            "hour": { "type": "integer", "minimum": 0, "maximum": 23 },
+            "adjusted": { "type": "boolean" },
+            "boundaryRisk": { "type": "boolean", "description": "校正后落在时辰交界±10分钟内，建议人工复核" },
+            "note": { "type": "string" }
+          }
+        },
+        "generatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "bazi": {
+      "type": "object",
+      "required": ["pillars", "hourPillarMissing", "dayMaster", "pillarsWuxing", "fiveElementsCount", "tenGods", "naYin", "daYun"],
+      "additionalProperties": false,
+      "properties": {
+        "pillars": {
+          "type": "object",
+          "required": ["year", "month", "day"],
+          "properties": {
+            "year": { "$ref": "#/definitions/ganZhi" },
+            "month": { "$ref": "#/definitions/ganZhi" },
+            "day": { "$ref": "#/definitions/ganZhi" },
+            "hour": { "oneOf": [{ "$ref": "#/definitions/ganZhi" }, { "type": "null" }], "description": "时辰未知为 null，且 hourPillarMissing 必须 = true" }
+          }
+        },
+        "hourPillarMissing": { "type": "boolean", "description": "true 时 pillars.hour 必须为 null，下游禁引时柱" },
+        "dayMaster": {
+          "type": "object",
+          "required": ["gan", "wuxing"],
+          "properties": {
+            "gan": { "type": "string", "pattern": "^[甲乙丙丁戊己庚辛壬癸]$" },
+            "wuxing": { "$ref": "#/definitions/wuXing" }
+          }
+        },
+        "pillarsWuxing": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "required": ["pillar", "gan", "ganWx", "zhi", "zhiWx"],
+            "properties": {
+              "pillar": { "enum": ["year", "month", "day", "hour"] },
+              "gan": { "type": ["string", "null"] },
+              "ganWx": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/wuXing" }] },
+              "zhi": { "type": ["string", "null"] },
+              "zhiWx": { "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/wuXing" }] }
+            }
+          }
+        },
+        "fiveElementsCount": {
+          "type": "object",
+          "description": "五行计数（木火土金水 → 数量，可为 0）",
+          "propertyNames": { "$ref": "#/definitions/wuXing" },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "tenGods": {
+          "type": "object",
+          "description": "十神。天干项为字符串，地支项为藏干十神数组",
+          "additionalProperties": { "type": ["string", "array", "null"] }
+        },
+        "naYin": { "type": "array", "items": { "type": ["string", "null"] }, "description": "四柱纳音，时柱缺失为 null" },
+        "daYun": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["ganzhi", "startAge", "endAge", "startYear", "endYear"],
+            "properties": {
+              "ganzhi": { "type": "string", "description": "起运前首运为空字符串" },
+              "startAge": { "type": "integer", "minimum": 0 },
+              "endAge": { "type": "integer" },
+              "startYear": { "type": "integer" },
+              "endYear": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "ziwei": {
+      "oneOf": [
+        { "$ref": "#/definitions/ziweiSkipped" },
+        { "$ref": "#/definitions/ziweiFull" }
+      ]
+    }
+  },
+  "definitions": {
+    "ganZhi": { "type": "string", "pattern": "^[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]$" },
+    "wuXing": { "type": "string", "enum": ["木", "火", "土", "金", "水"] },
+    "ziweiSkipped": {
+      "type": "object",
+      "required": ["skipped", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "skipped": { "const": true },
+        "reason": { "type": "string" }
+      }
+    },
+    "ziweiFull": {
+      "type": "object",
+      "required": ["soul", "body", "fiveElementsClass", "palaces", "byName", "keyPalaces"],
+      "additionalProperties": false,
+      "properties": {
+        "soul": { "type": "string", "description": "命主" },
+        "body": { "type": "string", "description": "身主" },
+        "fiveElementsClass": { "type": "string", "description": "五行局，如 火六局" },
+        "palaces": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": { "$ref": "#/definitions/palace" }
+        },
+        "byName": {
+          "type": "object",
+          "description": "宫名 → 宫位对象索引",
+          "additionalProperties": { "$ref": "#/definitions/palace" }
+        },
+        "keyPalaces": {
+          "type": "object",
+          "required": ["ming", "guanLu", "caiBo", "fuQi", "jiE", "tianZhai"],
+          "properties": {
+            "ming": { "oneOf": [{ "$ref": "#/definitions/palace" }, { "type": "null" }] },
+            "shen": { "oneOf": [{ "$ref": "#/definitions/palace" }, { "type": "null" }], "description": "身宫" },
+            "guanLu": { "oneOf": [{ "$ref": "#/definitions/palace" }, { "type": "null" }] },
+            "caiBo": { "oneOf": [{ "$ref": "#/definitions/palace" }, { "type": "null" }] },
+            "fuQi": { "oneOf": [{ "$ref": "#/definitions/palace" }, { "type": "null" }] },
+            "jiE": { "oneOf": [{ "$ref": "#/definitions/palace" }, { "type": "null" }] },
+            "tianZhai": { "oneOf": [{ "$ref": "#/definitions/palace" }, { "type": "null" }] }
+          }
+        }
+      }
+    },
+    "palace": {
+      "type": "object",
+      "required": ["name", "isBodyPalace", "majorStars", "minorStars", "adjectiveStars"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "宫名（iztro 命名：命宫/官禄/财帛/夫妻/疾厄/田宅等，多数不带宫字）" },
+        "isBodyPalace": { "type": "boolean" },
+        "majorStars": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "magnitude", "siHua"],
+            "properties": {
+              "name": { "type": "string" },
+              "magnitude": { "type": "string", "description": "庙旺利陷平不，空串为未标注" },
+              "siHua": { "enum": ["", "禄", "权", "科", "忌"] }
+            }
+          }
+        },
+        "minorStars": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "siHua"],
+            "properties": {
+              "name": { "type": "string" },
+              "siHua": { "enum": ["", "禄", "权", "科", "忌"] }
+            }
+          }
+        },
+        "adjectiveStars": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

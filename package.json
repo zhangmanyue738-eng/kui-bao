@@ -1,0 +1,19 @@
+{
+  "name": "mingli-consultant",
+  "version": "1.0.0",
+  "description": "> 接手自 2026-08-28 交接。完整交接提示词见： > `/Users/yanqiu/WorkBuddy/2026-08-25-16-34-33/.workbuddy/artifacts/handoff-prompt-bazi-ziwei-consultant.md` > 调研报告：同目录下 `bazi-ziwei-consultant-2026-08-28.md`、`dual-method-consultant-design-2026-08-28.md`",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "iztro": "^2.6.0",
+    "lunar-javascript": "^1.7.7"
+  }
+}

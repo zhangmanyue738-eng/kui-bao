@@ -1,0 +1,152 @@
+{
+  "meta": {
+    "dateStr": "1995-6-15",
+    "inputHour": null,
+    "effectiveHour": null,
+    "gender": "女",
+    "city": "杭州",
+    "trueSolar": null,
+    "generatedAt": "2026-08-28T06:32:10.886Z"
+  },
+  "bazi": {
+    "pillars": {
+      "year": "乙亥",
+      "month": "壬午",
+      "day": "丁丑",
+      "hour": null
+    },
+    "hourPillarMissing": true,
+    "dayMaster": {
+      "gan": "丁",
+      "wuxing": "火"
+    },
+    "pillarsWuxing": [
+      {
+        "pillar": "year",
+        "gan": "乙",
+        "ganWx": "木",
+        "zhi": "亥",
+        "zhiWx": "水"
+      },
+      {
+        "pillar": "month",
+        "gan": "壬",
+        "ganWx": "水",
+        "zhi": "午",
+        "zhiWx": "火"
+      },
+      {
+        "pillar": "day",
+        "gan": "丁",
+        "ganWx": "火",
+        "zhi": "丑",
+        "zhiWx": "土"
+      },
+      {
+        "pillar": "hour",
+        "gan": null,
+        "ganWx": null,
+        "zhi": null,
+        "zhiWx": null
+      }
+    ],
+    "fiveElementsCount": {
+      "木": 1,
+      "水": 2,
+      "火": 2,
+      "土": 1
+    },
+    "tenGods": {
+      "yearGan": "偏印",
+      "monthGan": "正官",
+      "yearZhi": [
+        "正官",
+        "正印"
+      ],
+      "monthZhi": [
+        "比肩",
+        "食神"
+      ],
+      "dayZhi": [
+        "食神",
+        "七杀",
+        "偏财"
+      ]
+    },
+    "naYin": [
+      "山头火",
+      "杨柳木",
+      "涧下水",
+      null
+    ],
+    "daYun": [
+      {
+        "ganzhi": "",
+        "startAge": 1,
+        "endAge": 7,
+        "startYear": 1995,
+        "endYear": 2001
+      },
+      {
+        "ganzhi": "癸未",
+        "startAge": 8,
+        "endAge": 17,
+        "startYear": 2002,
+        "endYear": 2011
+      },
+      {
+        "ganzhi": "甲申",
+        "startAge": 18,
+        "endAge": 27,
+        "startYear": 2012,
+        "endYear": 2021
+      },
+      {
+        "ganzhi": "乙酉",
+        "startAge": 28,
+        "endAge": 37,
+        "startYear": 2022,
+        "endYear": 2031
+      },
+      {
+        "ganzhi": "丙戌",
+        "startAge": 38,
+        "endAge": 47,
+        "startYear": 2032,
+        "endYear": 2041
+      },
+      {
+        "ganzhi": "丁亥",
+        "startAge": 48,
+        "endAge": 57,
+        "startYear": 2042,
+        "endYear": 2051
+      },
+      {
+        "ganzhi": "戊子",
+        "startAge": 58,
+        "endAge": 67,
+        "startYear": 2052,
+        "endYear": 2061
+      },
+      {
+        "ganzhi": "己丑",
+        "startAge": 68,
+        "endAge": 77,
+        "startYear": 2062,
+        "endYear": 2071
+      },
+      {
+        "ganzhi": "庚寅",
+        "startAge": 78,
+        "endAge": 87,
+        "startYear": 2072,
+        "endYear": 2081
+      }
+    ]
+  },
+  "ziwei": {
+    "skipped": true,
+    "reason": "时辰未定，紫微未排（降级为八字单术路径，B级精度）"
+  }
+}

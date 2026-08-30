@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>命理顾问 · 双术互证 MVP</title>
+<style>
+  :root {
+    --bg: #f7f5f0; --card: #ffffff; --ink: #2b2620; --muted: #8a8175;
+    --accent: #9c4a2f; --accent-light: #f3e4dd; --line: #e8e2d8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif; background: var(--bg); color: var(--ink); line-height: 1.7; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 20px 80px; }
+  header { text-align: center; margin-bottom: 36px; }
+  header h1 { font-size: 28px; letter-spacing: 8px; font-weight: 600; }
+  header p { color: var(--muted); font-size: 13px; margin-top: 6px; letter-spacing: 2px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px; margin-bottom: 24px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; background: #fdfcfa; font-family: inherit; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .domains { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .domains label { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; cursor: pointer; user-select: none; }
+  .domains input { display: none; }
+  .domains input:checked + span { color: var(--accent); font-weight: 600; }
+  .domains label:has(input:checked) { background: var(--accent-light); border-color: var(--accent); }
+  .btn { display: block; width: 100%; margin-top: 24px; padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 16px; letter-spacing: 6px; cursor: pointer; font-family: inherit; }
+  .btn:hover { opacity: .92; }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .notice { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
+  .chart-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+  .pillar { text-align: center; border: 1px solid var(--line); border-radius: 8px; padding: 10px 4px; background: #fdfcfa; }
+  .pillar .t { font-size: 12px; color: var(--muted); }
+  .pillar .gz { font-size: 20px; font-weight: 600; letter-spacing: 2px; }
+  .zx-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+  .palace { display: inline-block; padding: 2px 8px; margin: 3px; background: #fdfcfa; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+  .report { white-space: normal; }
+  .report h2, .report h3 { margin: 18px 0 8px; color: var(--accent); }
+  .report table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  .report th, .report td { border: 1px solid var(--line); padding: 8px 10px; font-size: 14px; text-align: left; }
+  .fb-btn { padding: 6px 18px; margin: 0 4px; border: 1px solid var(--line); border-radius: 999px; background: #fdfcfa; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .fb-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .conf-chip { display: inline-block; padding: 3px 12px; margin: 4px 6px 0 0; border-radius: 999px; font-size: 13px; border: 1px solid var(--line); background: #fdfcfa; }
+  .conf-chip.high { background: #eef4ea; border-color: #b7cfab; color: #4a6b3a; }
+  .conf-chip.medium { background: #f7f1e6; border-color: #ddc9a3; color: #8a6d2f; }
+  .conf-chip.conditional { background: #f3e8ee; border-color: #cfa8c0; color: #8a4a6b; }
+  .conf-chip.neutral { background: #f0f0ee; border-color: #d5d5d0; color: #777; }
+  .status { text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px; letter-spacing: 2px; }
+  .err { color: #b03a2e; background: #fdeeec; border: 1px solid #f0c4bd; border-radius: 8px; padding: 12px 16px; font-size: 14px; }
+  .disclaimer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; border-top: 1px solid var(--line); padding-top: 20px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>命理顾问</h1>
+    <p>八字 · 紫微斗数 双术排盘 / 排盘由确定性算法计算，解读由 AI 受约束生成</p>
+  </header>
+
+  <div class="card">
+    <div class="form-grid">
+      <div class="field">
+        <label>出生日期（公历）</label>
+        <input type="date" id="date" required>
+      </div>
+      <div class="field">
+        <label>出生时辰（不确定选「未知」）</label>
+        <select id="hour">
+          <option value="">未知（降级为三柱解读）</option>
+          <option value="0">子时 00-01</option><option value="1">丑时 01-03</option>
+          <option value="2">寅时 03-05</option><option value="3">卯时 05-07</option>
+          <option value="4">辰时 07-09</option><option value="5">巳时 09-11</option>
+          <option value="6">午时 11-13</option><option value="7">未时 13-15</option>
+          <option value="8">申时 15-17</option><option value="9">酉时 17-19</option>
+          <option value="10">戌时 19-21</option><option value="11">亥时 21-23</option>
+          <option value="23">晚子时 23-24</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>性别</label>
+        <select id="gender"><option>男</option><option>女</option></select>
+      </div>
+      <div class="field">
+        <label>出生城市（真太阳时校正）</label>
+        <input type="text" id="city" placeholder="如：深圳" list="cities">
+        <datalist id="cities"></datalist>
+      </div>
+    </div>
+    <div class="field" style="margin-top:16px">
+      <label>想了解的领域（可多选）</label>
+      <div class="domains">
+        <label><input type="checkbox" value="career" checked><span>事业</span></label>
+        <label><input type="checkbox" value="wealth" checked><span>财帛</span></label>
+        <label><input type="checkbox" value="marriage" checked><span>婚姻</span></label>
+        <label><input type="checkbox" value="health"><span>健康</span></label>
+        <label><input type="checkbox" value="annual"><span>流年</span></label>
+      </div>
+    </div>
+    <button class="btn" id="go">开始排盘解读</button>
+    <p class="notice">排盘不经过 AI（确定性算法）· 解读附盘面依据与古籍条文出处 · 双术互证分级置信度</p>
+  </div>
+
+  <div id="result"></div>
+
+  <p class="disclaimer">本工具输出为传统文化 / 娱乐参考，不构成医疗、投资、婚姻等重大决策建议。</p>
+</div>
+
+<script>
+const CITIES = ["北京","上海","广州","深圳","杭州","成都","重庆","武汉","西安","南京","苏州","天津","长沙","郑州","青岛","厦门","福州","沈阳","哈尔滨","乌鲁木齐","拉萨","昆明","贵阳","兰州","海口","香港","澳门","台北"];
+document.getElementById('cities').innerHTML = CITIES.map(c => `<option value="${c}">`).join('');
+document.getElementById('date').value = '1995-06-15';
+
+function esc(s){ const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML; }
+function mdLite(t){
+  let h = esc(t);
+  h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/^【(.+?)】/gm, '<strong>【$1】</strong>');
+  // 简易表格
+  h = h.replace(/((?:^\|.+\|$\n?)+)/gm, m => {
+    const rows = m.trim().split('\n').map(r => r.split('|').slice(1, -1).map(c => c.trim()));
+    if (rows.length < 2) return m;
+    const [head, , ...body] = rows;
+    return '<table><tr>' + head.map(c=>`<th>${c}</th>`).join('') + '</tr>' +
+      body.map(r => '<tr>' + r.map(c=>`<td>${c}</td>`).join('') + '</tr>').join('') + '</table>';
+  });
+  return h.replace(/\n/g, '<br>');
+}
+
+async function sendFeedback(rating) {
+  const area = document.getElementById('fb-area');
+  try {
+    await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...window._lastPayload, rating }) });
+    area.innerHTML = '<span style="font-size:13px;color:var(--accent)">已记录，感谢反馈（用于校正解读规则）</span>';
+  } catch (e) {
+    area.innerHTML = '<span style="font-size:13px;color:#b03a2e">反馈失败</span>';
+  }
+}
+
+document.getElementById('go').addEventListener('click', async () => {
+  const date = document.getElementById('date').value;
+  const hourRaw = document.getElementById('hour').value;
+  const gender = document.getElementById('gender').value;
+  const city = document.getElementById('city').value.trim();
+  const domains = [...document.querySelectorAll('.domains input:checked')].map(i => i.value);
+  const btn = document.getElementById('go');
+  const result = document.getElementById('result');
+  if (!date) { result.innerHTML = '<div class="card err">请先选择出生日期</div>'; return; }
+  btn.disabled = true;
+  result.innerHTML = '<div class="card status">排盘中（确定性算法）→ AI 解读中（约 20-40 秒）…</div>';
+  try {
+    const resp = await fetch('/api/interpret', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateStr: date, hour: hourRaw === '' ? null : Number(hourRaw), gender, city, domains })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    // 排盘摘要
+    const p = data.chart.bazi.pillars;
+    let html = `<div class="card"><h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:4px">八字四柱</h3>`;
+    if (data.chart.meta.trueSolar) html += `<p style="font-size:12px;color:var(--muted)">真太阳时校正：${esc(data.chart.meta.trueSolar.note)}</p>`;
+    html += `<div class="chart-grid">`;
+    for (const [name, gz] of [['年柱',p.year],['月柱',p.month],['日柱',p.day],['时柱',p.hour ?? '待定']]) {
+      html += `<div class="pillar"><div class="t">${name}</div><div class="gz">${esc(gz)}</div></div>`;
+    }
+    html += `</div>`;
+    const fe = data.chart.bazi.fiveElementsCount;
+    html += `<div style="margin-top:14px" class="zx-row"><span>五行分布</span><span>${Object.entries(fe).map(([k,v])=>k+':'+v).join('　')}</span></div>`;
+    if (!data.chart.ziwei.skipped) {
+      const kp = data.chart.ziwei.keyPalaces;
+      html += `<h3 style="color:var(--accent);letter-spacing:4px;margin:18px 0 8px">紫微关键宫位（${esc(data.chart.ziwei.soul)} 命 · ${esc(data.chart.ziwei.fiveElementsClass)}）</h3>`;
+      for (const [k, label] of [['ming','命宫'],['guanLu','官禄'],['caiBo','财帛'],['fuQi','夫妻'],['jiE','疾厄']]) {
+        const pal = kp[k];
+        if (!pal) continue;
+        const stars = pal.majorStars.map(s => s.name + (s.magnitude?`[${s.magnitude}]`:'') + (s.siHua?`(${s.siHua})`:'')).join(' ');
+        html += `<span class="palace"><strong>${label}</strong> ${esc(stars || '无主星')}</span>`;
+      }
+    } else {
+      html += `<p style="margin-top:14px;color:var(--muted);font-size:14px">时辰未定，紫微未排 —— 本次为八字单术解读（B 级精度）</p>`;
+    }
+    // 互证合成 · 各领域置信度
+    if (data.synthesis && data.synthesis.results) {
+      const DN = { career: '事业', wealth: '财帛', marriage: '婚姻', health: '健康', annual: '流年' };
+      const DCN = { favorable: '利', unfavorable: '需留意', neutral: '平稳' };
+      const VCN = { consistent: '双术一致', 'single-method': '单术信号', conditional: '双术冲突' };
+      html += `<h3 style="color:var(--accent);letter-spacing:4px;margin:18px 0 4px">互证合成</h3>`;
+      html += `<div>`;
+      for (const r of data.synthesis.results) {
+        const cls = r.direction === 'neutral' ? 'neutral' : r.confidence;
+        html += `<span class="conf-chip ${cls}"><strong>${DN[r.domain] || r.domain}</strong> ${DCN[r.direction] || r.direction} · ${VCN[r.verdict] || r.verdict}（置信度：${r.confidence === 'high' ? '高' : r.confidence === 'medium' ? '中' : r.confidence === 'conditional' ? '条件式' : '中'}）</span>`;
+      }
+      html += `</div><p style="font-size:12px;color:var(--muted);margin-top:6px">双术一致 → 置信度高；单术有信号 → 中；双术冲突 → 条件式结论（正文中以「若…则…」呈现）</p>`;
+    }
+    html += `</div><div class="card report"><h2 style="letter-spacing:4px;color:var(--accent)">解读报告</h2><p style="font-size:12px;color:var(--muted);margin-bottom:8px">模型：${esc(data.model)} · tokens：${data.usage?.total_tokens ?? '-'} · 知识库条文：${(data.passages && data.passages.length) ? data.passages.length + ' 条' : '未启用'}</p><div class="report-body">${mdLite(data.report)}</div>
+      <div style="margin-top:24px;border-top:1px dashed var(--line);padding-top:16px;text-align:center" id="fb-area">
+        <span style="font-size:13px;color:var(--muted);margin-right:10px">这份解读对你有参考价值吗？</span>
+        <button class="fb-btn" onclick="sendFeedback('good')">有帮助</button>
+        <button class="fb-btn" onclick="sendFeedback('bad')">不准/没帮助</button>
+      </div></div>`;
+    result.innerHTML = html;
+    window._lastPayload = { input: { dateStr: date, hour: hourRaw === '' ? null : Number(hourRaw), gender, city, domains }, report: data.report };
+  } catch (e) {
+    result.innerHTML = `<div class="card err">出错了：${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
