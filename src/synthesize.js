@@ -7,6 +7,8 @@
  *
  * 程序只输出方向 + 强度 + 证据，措辞交给解读层。
  */
+const fs = require('fs');
+const path = require('path');
 
 // ───────── 五行生克表 ─────────
 const SHENG = { 木: '火', 火: '土', 土: '金', 金: '水', 水: '木' }; // 我生
@@ -29,7 +31,29 @@ const GOD_GROUPS = {
   比肩: 'bijie', 劫财: 'bijie', 食神: 'shishang', 伤官: 'shishang',
 };
 
-// ───────── 简化喜用神（扶抑法 + 月令加权） ─────────
+// ───────── 调候用神表（《穷通宝鉴》，结构化数据） ─────────
+let TIAOHOU = null;
+function loadTiaohou() {
+  if (TIAOHOU) return TIAOHOU;
+  const p = path.join(__dirname, '..', 'data', 'tiaohou-table.json');
+  TIAOHOU = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : {};
+  return TIAOHOU;
+}
+function tiaohouOf(dayGan, monthZhi) {
+  const row = (loadTiaohou()[dayGan] || {})[monthZhi + '月'];
+  return row ? { yongshen: row.yongshen, note: row.note, season: row.season } : null;
+}
+
+// 从格/专旺判定阈值（同党占八字总五行数的比例）
+// 实测（n=2000）：中位 0.44 / P95 0.78 / 下限 0.111（日主自身必计入，故从弱阈值须 > 0.111）
+// 取 0.78 / 0.13 → 命中率约 5%，贴近命理界对从格占比的经验估计
+const CONG_GE = { ZHUAN_WANG: 0.78, CONG_RUO: 0.13 };
+
+/**
+ * 喜用神（扶抑法 + 月令加权 + 调候参考 + 从格/专旺粗判）
+ * 从格（从财/从杀/从儿）与专旺格的用神与扶抑法相反，
+ * 这类盘用纯扶抑法会系统性判反 → 检测到即降级置信度并提示人工复核。
+ */
 function favorableElements(bazi) {
   const dm = bazi.dayMaster.wuxing;
   const wu = { ...bazi.fiveElementsCount };
@@ -39,10 +63,38 @@ function favorableElements(bazi) {
   const ge = GOD_GROUP_ELEMENT(dm);
   const support = (wu[ge.bijie] || 0) + (wu[ge.yin] || 0);
   const total = Object.values(wu).reduce((a, b) => a + b, 0);
-  const strong = support / total >= 0.5;
+  const ratio = total ? support / total : 0;
+  const strong = ratio >= 0.5;
   const favorable = strong ? [ge.shishang, ge.cai, ge.guansha] : [ge.bijie, ge.yin];
   const unfavorable = strong ? [ge.bijie, ge.yin] : [ge.shishang, ge.cai, ge.guansha];
-  return { strong, favorable, unfavorable, evidence: `日主${dm}，同党(比劫${ge.bijie}+印${ge.yin})合计${support}/${total}${strong ? ' ≥' : ' <'}50% 判身${strong ? '强' : '弱'}，喜用${favorable.join('/')}` };
+
+  // 从格 / 专旺粗判
+  let congGe = null;
+  if (ratio >= CONG_GE.ZHUAN_WANG) congGe = '专旺（日主极强，宜顺其势）';
+  else if (ratio <= CONG_GE.CONG_RUO) congGe = '从弱（日主极弱，宜弃命从势）';
+
+  // 调候用神（穷通宝鉴）
+  const monthZhi = bazi.pillars.month[1];
+  const th = tiaohouOf(bazi.dayMaster.gan, monthZhi);
+  const thElements = th ? [...new Set((th.yongshen.match(/[木火土金水]/g) || []))] : [];
+  // 「冲突」的严格定义：调候用神与扶抑用神毫无交集（调候要的正是扶抑视为忌的）
+  // 若二者有任一交集即视为协调，避免把正常情况误报为冲突
+  const thConflict = thElements.length
+    ? thElements.every(el => !favorable.includes(el))
+    : false;
+
+  const warnings = [];
+  if (congGe) warnings.push(`疑似${congGe}，扶抑法用神可能反向，以下结论需人工复核`);
+  if (th && thConflict) warnings.push(`调候用神(${th.yongshen})与扶抑用神不一致，寒暖燥湿为急，实务中先论调候`);
+  else if (th) warnings.push(`调候用神：${th.yongshen}（${th.season || ''}${th.note || ''}）`);
+
+  return {
+    strong, favorable, unfavorable, ratio: +ratio.toFixed(3), congGe,
+    tiaohou: th ? { yongshen: th.yongshen, note: th.note, conflict: thConflict } : null,
+    warnings,
+    evidence: `日主${dm}，同党(比劫${ge.bijie}+印${ge.yin})合计${support}/${total}（${(ratio * 100).toFixed(0)}%）判身${strong ? '强' : '弱'}，喜用${favorable.join('/')}` +
+      (th ? `；调候用神${th.yongshen}` : '') + (congGe ? `；⚠️ 疑似${congGe}` : ''),
+  };
 }
 
 // 十神组在盘中的喜忌
@@ -315,9 +367,16 @@ function synthesize(chart, domains) {
   const results = domains.map(d => {
     const baziS = baziGetters[d] ? baziGetters[d]() : { direction: 'neutral', strength: 0.2, evidence: [], conditions: [] };
     const zwS = zwGetters[d] ? zwGetters[d]() : { direction: 'neutral', strength: 0, evidence: [], conditions: [] };
-    return synthesizePair(d, baziS, zwS);
+    const r = synthesizePair(d, baziS, zwS);
+    // 从格/专旺：用神可能反向 → 置信度封顶为「中」，并附复核提示
+    if (fe.congGe && r.confidence === 'high') {
+      r.confidence = 'medium';
+      r.note = (r.note ? r.note + '；' : '') + '疑似' + fe.congGe + '，置信度已下调';
+      r.conditions = [...(r.conditions || []), '⚠️ 疑似' + fe.congGe + '，扶抑法用神可能反向，建议人工复核后再采信'];
+    }
+    return r;
   });
-  return { favorableElements: fe, results };
+  return { favorableElements: fe, results, warnings: fe.warnings || [] };
 }
 
 module.exports = { synthesize, favorableElements };

@@ -7,7 +7,15 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "kb": "node src/build-kb.js",
+    "verify": "node src/verify-chart.js 3000",
+    "crosscheck": "node src/cross-check.js 1000",
+    "schema": "node src/validate-schema.js",
+    "eval": "node src/eval.js",
+    "stability": "node src/stability.js 3",
+    "test": "npm run schema && npm run verify && npm run crosscheck",
+    "test:full": "npm test && npm run stability"
   },
   "keywords": [],
   "author": "",

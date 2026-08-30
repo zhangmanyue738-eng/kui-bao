@@ -25,9 +25,15 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
     req.on('end', () => {
       try {
-        const { input, report, rating, comment } = JSON.parse(body);
+        const { input, report, rating, comment, facts } = JSON.parse(body);
         if (!['good', 'bad'].includes(rating)) throw new Error('rating 必须是 good 或 bad');
-        const record = { ts: new Date().toISOString(), input, rating, comment: (comment || '').slice(0, 2000), report: (report || '').slice(0, 20000) };
+        // facts：用户补充的真实人生事实（哪年发生了什么），是后续校正取证规则的关键数据
+        const record = {
+          ts: new Date().toISOString(), input, rating,
+          comment: (comment || '').slice(0, 2000),
+          facts: (facts || '').slice(0, 2000),
+          report: (report || '').slice(0, 20000),
+        };
         fs.appendFileSync(path.join(__dirname, '..', 'data', 'feedback.jsonl'), JSON.stringify(record) + '\n');
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true }));

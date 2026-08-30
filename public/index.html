@@ -130,9 +130,11 @@ function mdLite(t){
 
 async function sendFeedback(rating) {
   const area = document.getElementById('fb-area');
+  const factsEl = document.getElementById('fb-facts');
+  const facts = factsEl ? factsEl.value.trim() : '';
   try {
     await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...window._lastPayload, rating }) });
+      body: JSON.stringify({ ...window._lastPayload, rating, facts }) });
     area.innerHTML = '<span style="font-size:13px;color:var(--accent)">已记录，感谢反馈（用于校正解读规则）</span>';
   } catch (e) {
     area.innerHTML = '<span style="font-size:13px;color:#b03a2e">反馈失败</span>';
@@ -157,6 +159,13 @@ document.getElementById('go').addEventListener('click', async () => {
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
+    if (data.complianceFailed) {
+      result.innerHTML = `<div class="card err"><strong>本次解读未通过合规校验，已拦��不予输出。</strong><br>
+        未通过项：${esc((data.problems || []).join('；'))}<br>
+        <span style="font-size:13px">系统宁可不给结论，也不输出无依据或引起焦虑的内容。请稍后重试一次。</span></div>`;
+      btn.disabled = false;
+      return;
+    }
     // 排盘摘要
     const p = data.chart.bazi.pillars;
     let html = `<div class="card"><h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:4px">八字四柱</h3>`;
@@ -198,6 +207,10 @@ document.getElementById('go').addEventListener('click', async () => {
         <span style="font-size:13px;color:var(--muted);margin-right:10px">这份解读对你有参考价值吗？</span>
         <button class="fb-btn" onclick="sendFeedback('good')">有帮助</button>
         <button class="fb-btn" onclick="sendFeedback('bad')">不准/没帮助</button>
+        <div style="margin-top:12px">
+          <input id="fb-facts" type="text" placeholder="可选：补充真实情况（如「2020年确实换了行业」），用于校正解读规则"
+                 style="width:100%;max-width:520px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fdfcfa;font-family:inherit">
+        </div>
       </div></div>`;
     result.innerHTML = html;
     window._lastPayload = { input: { dateStr: date, hour: hourRaw === '' ? null : Number(hourRaw), gender, city, domains }, report: data.report };

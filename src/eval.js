@@ -9,8 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const { buildChart } = require('./chart.js');
 const { synthesize } = require('./synthesize.js');
-const { interpret, validateCitations } = require('./interpret.js');
-const { retrieve } = require('./retrieve.js');
+const { interpret, validateOutput } = require('./interpret.js');
+const { loadKB } = require('./retrieve.js');
 
 function loadEnv() {
   const envPath = path.join(__dirname, '..', '.env');
@@ -43,7 +43,7 @@ function audit(report, chart, domains, synthesis, passages) {
   checks['格式:置信度数=结论数'] = nConf === nConclusion;
   // 2. 出处合法性
   const slim = { bazi: chart.bazi, ziwei: chart.ziwei, meta: chart.meta };
-  const citeProblems = passages.length ? validateCitations(report, passages) : [];
+  const citeProblems = passages.length ? validateOutput(report, passages, synthesis) : [];
   checks['出处:零伪造引用'] = citeProblems.length === 0;
   // 3. 禁止词
   const hitForbidden = FORBIDDEN.filter(w => report.includes(w));
@@ -74,9 +74,9 @@ async function runCase(model, c) {
   const t0 = Date.now();
   const r = await interpret({ chart, domains: c.domains, synthesis, model });
   const latency = ((Date.now() - t0) / 1000).toFixed(1);
-  // 复算检索条文（interpret 内部做了一遍，这里为审计取同集合）
-  const { slimChart } = require('./interpret.js');
-  const passages = retrieve(slimChart(chart), c.domains, 10);
+  // 必须用 interpret 实际注入的条文来审计（自己再检索一遍会因配额策略不同而误判）
+  const kbAll = loadKB();
+  const passages = (r.passages || []).map(id => kbAll.find(e => e.id === id)).filter(Boolean);
   const { checks, problems } = audit(r.report, chart, c.domains, synthesis, r.rag ? passages : []);
   const passCount = Object.values(checks).filter(Boolean).length;
   return {

@@ -5,7 +5,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { retrieve } = require('./retrieve.js');
+const { retrieveBalanced } = require('./retrieve.js');
 
 function loadEnv() {
   const envPath = path.join(__dirname, '..', '.env');
@@ -105,7 +105,13 @@ function slimChart(chart) {
   return { meta: { dateStr: chart.meta.dateStr, gender: chart.meta.gender, city: chart.meta.city, trueSolar: chart.meta.trueSolar }, bazi, ziwei };
 }
 
-/** 后置校验：输出中的出处引用必须都在所给条文集合内 */
+// 合规禁词表（渲染焦虑 / 绝对断言 / 宿命论）
+const FORBIDDEN_WORDS = ['必将', '肯定会', '命中注定', '大凶', '血光', '破财之灾', '克夫', '克妻',
+  '牢狱', '一定会', '不可能不', '注定要', '在劫难逃', '凶多吉少'];
+// 置信度档位归一化
+const CONF_KIND = { high: '高', medium: '中', conditional: '条件式' };
+
+/** 后置校验：出处引用必须都在所给条文集合内 */
 function validateCitations(report, passages) {
   const idSet = new Set(passages.map(p => p.id));
   const srcText = passages.map(p => p.source + p.text).join('\n');
@@ -116,6 +122,29 @@ function validateCitations(report, passages) {
   }
   for (const m of report.matchAll(/《([^》]{2,20})》/g)) {
     if (!srcText.includes(m[1])) problems.push(`引用了知识库外的书名《${m[1]}》`);
+  }
+  return problems;
+}
+
+/**
+ * 完整输出校验（三类硬门禁）：
+ *   1 出处：引用必须在所给条文内
+ *   2 合规：不得出现焦虑/宿命禁词
+ *   3 互证：置信度档位种类必须与合成结果一致，不得自行调级
+ */
+function validateOutput(report, passages, synthesis) {
+  const problems = [];
+  if (passages.length) problems.push(...validateCitations(report, passages));
+
+  const hit = FORBIDDEN_WORDS.filter(w => report.includes(w));
+  if (hit.length) problems.push(`使用了禁止词：${hit.join('、')}`);
+
+  if (synthesis && synthesis.results && synthesis.results.length) {
+    const expected = new Set(synthesis.results.map(r => CONF_KIND[r.confidence]).filter(Boolean));
+    const actual = new Set();
+    for (const m of report.matchAll(/【置信度】\s*([高中]|条件式|平稳)/g)) actual.add(m[1]);
+    for (const k of expected) if (!actual.has(k)) problems.push(`缺少合成结果要求的置信度档位「${k}」`);
+    for (const k of actual) if (!expected.has(k)) problems.push(`出现了合成结果中不存在的置信度档位「${k}」（不得自行调级）`);
   }
   return problems;
 }
@@ -160,8 +189,15 @@ function synthesisBlock(synthesis) {
     if (r.conditions && r.conditions.length) l += '\n    条件变量：' + r.conditions.join('；');
     return l;
   });
-  return '互证合成结果（每领域的结论方向、置信度档位必须严格与此一致）：\n' + lines.join('\n') +
+  let block = '互证合成结果（每领域的结论方向、置信度档位必须严格与此一致）：\n' + lines.join('\n') +
     `\n喜用神参考：${synthesis.favorableElements ? synthesis.favorableElements.evidence : ''}`;
+  // 从格/调候告警：命中时必须在报告「命盘速览」后用一句话向用户明示，不得隐去
+  const warns = synthesis.warnings || (synthesis.favorableElements && synthesis.favorableElements.warnings) || [];
+  if (warns.length) {
+    block += '\n\n⚠️ 盘面特殊情况（必须在「命盘速览」之后用一句话告知用户，不得隐去）：\n' +
+      warns.map(w => '  - ' + w).join('\n');
+  }
+  return block;
 }
 
 async function interpret({ chart, domains, synthesis, model: modelOverride }) {
@@ -172,7 +208,7 @@ async function interpret({ chart, domains, synthesis, model: modelOverride }) {
   const slim = slimChart(chart);
 
   // RAG 检索
-  const passages = retrieve(slim, domainList, 10);
+  const passages = retrieveBalanced(slim, domainList, 10);
   const passageBlock = passages.length
     ? '知识库检索条文（引用只能出自以下列表）：\n' +
       passages.map(p => `[${p.id}] ${p.source}：${p.text}`).join('\n\n')
@@ -190,25 +226,36 @@ async function interpret({ chart, domains, synthesis, model: modelOverride }) {
     passageBlock,
   ].filter(Boolean).join('\n');
 
-  if (passages.length) {
-    // 第一轮：RAG 版
-    const r1 = await callLLM(SYSTEM_PROMPT_RAG, userMsg, modelOverride);
-    const problems = validateCitations(r1.report, passages);
-    if (problems.length === 0) return { ...r1, rag: true, passages: passages.map(p => p.id) };
-    // 第二轮：带违规提醒重生成
-    const r2 = await callLLM(SYSTEM_PROMPT_RAG, userMsg + `\n\n【上一稿违规，必须修正】${problems.join('；')}。只允许引用条文列表中真实存在的 [KB-编号] 与《书名》。`, modelOverride);
-    const problems2 = validateCitations(r2.report, passages);
-    if (problems2.length === 0) return { ...r2, rag: true, passages: passages.map(p => p.id) };
-    // 两轮都违规 → 降级为无 RAG 模式（保证零伪造出处）
-    const r3 = await callLLM(SYSTEM_PROMPT_MVP, userMsg.split('知识库检索条文')[0], modelOverride);
-    return { ...r3, rag: false, degraded: true, citationsFailed: problems2, passages: [] };
-  }
+  // 最多三轮：RAG 版 → 带违规提醒重生成 → 无 RAG 降级版（每轮都过三类硬门禁）
+  const attempts = passages.length ? [
+    { prompt: SYSTEM_PROMPT_RAG, msg: userMsg, rag: true },
+    { prompt: SYSTEM_PROMPT_RAG, msg: userMsg + '\n\n【上一稿未通过校验，必须修正】', rag: true },
+    { prompt: SYSTEM_PROMPT_MVP, msg: userMsg.split('知识库检索条文')[0], rag: false },
+  ] : [
+    { prompt: SYSTEM_PROMPT_MVP, msg: userMsg, rag: false },
+    { prompt: SYSTEM_PROMPT_MVP, msg: userMsg + '\n\n【上一稿未通过校验，必须修正】', rag: false },
+  ];
 
-  const r = await callLLM(SYSTEM_PROMPT_MVP, userMsg, modelOverride);
-  return { ...r, rag: false, passages: [] };
+  let lastProblems = [];
+  for (let i = 0; i < attempts.length; i++) {
+    const a = attempts[i];
+    const msg = i > 0 ? a.msg + lastProblems.join('；') + '。' : a.msg;
+    const r = await callLLM(a.prompt, msg, modelOverride);
+    const problems = validateOutput(r.report, a.rag ? passages : [], synthesis);
+    if (problems.length === 0) {
+      return { ...r, rag: a.rag, degraded: a.rag === false && passages.length > 0,
+        passages: a.rag ? passages.map(p => p.id) : [] };
+    }
+    lastProblems = problems;
+  }
+  // 三轮都没通过 → 不返回报告，交由调用方提示重试（宁可不给，也不输出违规内容）
+  return {
+    report: '', rag: false, degraded: true, complianceFailed: true,
+    problems: lastProblems, passages: [], usage: {}, model: 'compliance-blocked',
+  };
 }
 
-module.exports = { interpret, slimChart, SYSTEM_PROMPT_RAG, SYSTEM_PROMPT_MVP, validateCitations };
+module.exports = { interpret, slimChart, SYSTEM_PROMPT_RAG, SYSTEM_PROMPT_MVP, validateCitations, validateOutput, FORBIDDEN_WORDS };
 
 if (require.main === module) {
   const { buildChart } = require('./chart.js');
