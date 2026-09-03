@@ -61,6 +61,7 @@ function starSiHua(s) {
 /** 从 slimChart 提取检索词 */
 function extractQueryTerms(chart, domains) {
   const terms = new Set();
+  const starTerms = new Set();   // 星曜路径产出的词（区分度来自「这颗星在不在盘上」）
   const b = chart.bazi;
   // 八字天干（年/日/时干，用于流年断语、六亲等条目匹配）
   terms.add(b.dayMaster.gan); terms.add(b.dayMaster.wuxing);
@@ -92,23 +93,33 @@ function extractQueryTerms(chart, domains) {
       if (pname) terms.add(pname);
       for (const s of (p.majorStars || [])) {
         const n = starName(s);
-        if (n) terms.add(n);
+        if (n) { terms.add(n); starTerms.add(n); }
         const si = starSiHua(s);
-        if (si) terms.add('化' + si);
+        if (si) { terms.add('化' + si); starTerms.add('化' + si); }
       }
       for (const s of (p.minorStars || [])) {
         const n = starName(s);
-        if (n) terms.add(n);
+        if (n) { terms.add(n); starTerms.add(n); }
       }
     }
-    // 用语义化字段名；命主/身主同样是可检索的盘面特征（KB 里有按星曜立论的条文）
-    for (const k of ['mingZhu', 'shenZhu', 'fiveElementsClass']) if (zw[k]) terms.add(zw[k]);
+    // 用语义化字段名。命主/身主是真实星曜（巨门/文昌…），走星曜通道；
+    // 五行局（水二局…）是分类标签，每个盘都必然有、无区分度，只进普通词池。
+    // 分清楚很重要：starTerms 会享受「豁免领域词排除」的待遇，不该给它。
+    for (const k of ['mingZhu', 'shenZhu']) {
+      if (zw[k]) { terms.add(zw[k]); starTerms.add(zw[k]); }
+    }
+    if (zw.fiveElementsClass) terms.add(zw.fiveElementsClass);
   }
   // 领域词单独返回：只作轻度加权，不能淹没盘面特征
   const domainTerms = new Set();
   for (const d of domains) for (const t of (DOMAIN_TERMS[d] || [])) domainTerms.add(t);
-  const featureTerms = [...terms].filter(t => t && t.length >= 1 && !domainTerms.has(t));
-  return { featureTerms, domainTerms: [...domainTerms] };
+  // 星曜词不受领域词排除：武曲/破军/禄存/七杀同时出现在 DOMAIN_TERMS 里，
+  // 原逻辑一并挡下，于是「命盘有武曲」与「命盘没武曲」在检索时得分一样——
+  // 紫微侧最有区分度的信号被抹平了。
+  // 但星曜词在打分时会限累加次数（见 retrieve），避免星曜密集的条文独占 top-10。
+  const featureTerms = [...terms].filter(t =>
+    t && t.length >= 1 && (!domainTerms.has(t) || starTerms.has(t)));
+  return { featureTerms, domainTerms: [...domainTerms], starTerms };
 }
 
 /**
@@ -120,7 +131,8 @@ function retrieve(chart, domains, k = 10, opts = {}) {
   const kb = loadKB();
   let pool = opts.publicOnly ? kb.filter(e => e.license === 'public_domain') : kb;
   if (opts.tradition) pool = pool.filter(e => e.tradition === opts.tradition);
-  const { featureTerms, domainTerms } = extractQueryTerms(chart, domains);
+  const { featureTerms, domainTerms, starTerms } = extractQueryTerms(chart, domains);
+  const starSet = starTerms instanceof Set ? starTerms : new Set(starTerms || []);
   const scored = pool.map(e => {
     let score = 0;
     // 盘面特征词（星曜/十神/宫位/日干月令）：主要信号，逐次命中累加
@@ -129,7 +141,11 @@ function retrieve(chart, domains, k = 10, opts = {}) {
     for (const t of featureTerms) {
       let idx = 0, hits = 0;
       while ((idx = e.text.indexOf(t, idx)) !== -1) { hits++; idx += t.length; if (hits > 5) break; }
-      score += hits * weight(t);
+      // 星曜词限累加：只放行不设限的话，少数「星曜密集」的条文得分暴涨并独占 top-10，
+      // 实测反而让星曜覆盖率从 84% 掉到 74%——密集 ≠ 相关。限到 2 次后，
+      // 「有这颗星 vs 没这颗星」仍有区分度，又不会让单一条文通吃。
+      const capped = starSet.has(t) ? Math.min(hits, 2) : hits;
+      score += capped * weight(t);
     }
     // 领域词：仅轻度加权并封顶（避免不同命盘检索结果雷同）
     let dHits = 0;

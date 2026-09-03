@@ -16,6 +16,8 @@
     "stability": "node src/stability.js 3",
     "bench": "node src/bench.js",
     "ragcheck": "node tools/rag-check.js",
+    "rq": "node tools/retrieval-quality.js",
+    "rq:base": "LEGACY=1 node tools/retrieval-quality.js",
     "test": "npm run schema && npm run verify && npm run crosscheck && npm run bench -- --verify",
     "test:full": "npm test && npm run stability",
     "sessions": "node src/sessions.js",
