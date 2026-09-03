@@ -1,6 +1,6 @@
 .env
 node_modules/
-knowledge/
-data/
+data/sessions.jsonl
+data/feedback.jsonl
 *.log
 .DS_Store
