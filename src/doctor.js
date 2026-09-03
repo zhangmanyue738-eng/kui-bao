@@ -462,7 +462,9 @@ function checkSmoke() {
         : (p.year && p.month && p.day && p.hour && chart.ziwei && chart.ziwei.soul);
       if (!need) { fail('排盘冒烟', c.name, `关键字段缺失：${JSON.stringify(p)}`, '检查 chart.js'); continue; }
       const extra = c.input.hour == null ? '（已降级为八字三柱）'
-        : `（${p.year} ${p.month} ${p.day} ${p.hour}，命宫主星 ${chart.ziwei.soul || '?'}）`;
+        // 说「命主」而不是「命宫主星」：ziwei.soul 是按命宫地支查表得来的命主，
+        // 命宫里坐的星是 mingGongStars。叫错了就是在给下游埋误读（见 chart.js 注释）
+        : `（${p.year} ${p.month} ${p.day} ${p.hour}，命主 ${chart.ziwei.mingZhu || '?'}，命宫主星 ${(chart.ziwei.mingGongStars || []).join('、') || '空宫'}）`;
       ok('排盘冒烟', c.name, '通过' + extra);
     } catch (e) {
       fail('排盘冒烟', c.name, `抛异常：${e.message}`, '检查 chart.js 及依赖版本');
@@ -564,6 +566,62 @@ function checkSessions() {
   }
 }
 
+/**
+ * 第 11 组：命理知识题库（bench）
+ *
+ * 只查「文件在不在」不够。题库有三个真实风险，都必须体检：
+ *   ① 条数太少 —— 统计上不可信，跑出来的正确率没意义
+ *   ② 题型缺失 —— 少一种题型就等于那一块能力没被测到，而报告上看不出来
+ *   ③ drift      —— 排盘层改了但题库没重算，答案与现算结果对不上，
+ *                   此时评测会把「排盘层变了」误报成「模型退步了」
+ * drift 检测不联网、秒级，适合常驻体检。
+ */
+function checkBench() {
+  const BENCH_FILE = path.join(ROOT, 'data', 'bench.jsonl');
+  if (!fs.existsSync(BENCH_FILE)) {
+    warn('命理题库', '题库文件', 'data/bench.jsonl 不存在', '运行 npm run bench -- --build 生成题库');
+    return;
+  }
+
+  let rows;
+  try {
+    rows = fs.readFileSync(BENCH_FILE, 'utf8').trim().split('\n')
+      .filter(Boolean).map(l => JSON.parse(l));
+  } catch (e) {
+    fail('命理题库', '可解析性', `解析失败：${e.message}`, '题库 JSONL 损坏，运行 npm run bench -- --build 重建');
+    return;
+  }
+
+  // 必备题型：缺任何一种，报告里的「总正确率」都是虚高的
+  const REQUIRED = ['dayMaster', 'hourGan', 'monthGan', 'dayunDirection', 'mingZhu', 'adversarial'];
+  const byType = {};
+  for (const r of rows) byType[r.type] = (byType[r.type] || 0) + 1;
+  const missing = REQUIRED.filter(t => !byType[t]);
+
+  if (rows.length < 40) {
+    warn('命理题库', '题量', `仅 ${rows.length} 题`, '建议 ≥40 题，否则分题型正确率的抽样误差过大');
+  } else {
+    ok('命理题库', '题量', `${rows.length} 题`);
+  }
+
+  missing.length
+    ? fail('命理题库', '题型覆盖', `缺少题型：${missing.join('、')}`,
+        '检查对应生成器是否因自校验守卫全部跳过了题（宁可不出题，也不能出自相矛盾的题）')
+    : ok('命理题库', '题型覆盖', `${Object.keys(byType).length} 种题型齐全（${Object.entries(byType).map(([k, v]) => k + ' ' + v).join(' · ')}）`);
+
+  // drift：重算答案与存盘答案比对。这是把「排盘层改动」与「模型退步」区分开的唯一手段。
+  try {
+    const { verifyBench } = require('./bench.js');
+    const res = verifyBench();
+    res.drift === 0
+      ? ok('命理题库', 'drift 检测', `${res.total} 题答案与现算一致`)
+      : fail('命理题库', 'drift 检测', `${res.drift}/${res.total} 题答案已漂移：${res.samples.join('；')}`,
+          '排盘层或合成规则改过了，运行 npm run bench -- --build 重算题库；否则评测会把排盘变化误判为模型退步');
+  } catch (e) {
+    warn('命理题库', 'drift 检测', `无法执行：${e.message}`, '检查 src/bench.js 是否导出了 verifyBench');
+  }
+}
+
 // =====================================================================
 // 输出
 // =====================================================================
@@ -617,6 +675,7 @@ async function main() {
   checkPython();
   checkSmoke();
   checkSessions();
+  checkBench();
   await checkLLM();
   await checkService();
 

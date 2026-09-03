@@ -14,7 +14,9 @@
     "schema": "node src/validate-schema.js",
     "eval": "node src/eval.js",
     "stability": "node src/stability.js 3",
-    "test": "npm run schema && npm run verify && npm run crosscheck",
+    "bench": "node src/bench.js",
+    "ragcheck": "node tools/rag-check.js",
+    "test": "npm run schema && npm run verify && npm run crosscheck && npm run bench -- --verify",
     "test:full": "npm test && npm run stability",
     "sessions": "node src/sessions.js",
     "doctor": "node src/doctor.js"
