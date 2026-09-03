@@ -15,7 +15,8 @@
     "eval": "node src/eval.js",
     "stability": "node src/stability.js 3",
     "test": "npm run schema && npm run verify && npm run crosscheck",
-    "test:full": "npm test && npm run stability"
+    "test:full": "npm test && npm run stability",
+    "doctor": "node src/doctor.js"
   },
   "keywords": [],
   "author": "",

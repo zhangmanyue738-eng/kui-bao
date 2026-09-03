@@ -77,7 +77,8 @@ function verifyOne(dateStr, hour, gender) {
   }
 
   // ── L2b: 五鼠遁（日干定时干）
-  //  晚子时（23:00-24:00）属次日子时，时柱天干按「次日日干」起算（本项目默认晚子时流派）
+  //  默认口径为「夜子时」：23:00-24:00 日柱仍当日，时干按次日日干起算（lunar 库 sect=2）
+  //  三档子时口径的完整自洽性由 L2-子时口径* 单独校验（见 verifyZishi）
   if (hour != null && b.pillars.hour) {
     let dayGan = b.pillars.day[0];
     if (hour === 23) {
@@ -91,8 +92,8 @@ function verifyOne(dateStr, hour, gender) {
     check('L2-五鼠遁时干', expectGan === hourGan,
       `${dateStr} ${hour}时 ${hour === 23 ? '晚子时按次日日干' : '日干'}${dayGan} → 时干应为${expectGan}，实际${hourGan}`);
     if (hour === 23) {
-      check('L2-晚子时换日(流派)', expectGan === hourGan,
-        `${dateStr} 23时 晚子时流派校验失败（若项目改早子时流派，此项需同步调整）`);
+      check('L2-夜子时换日(默认口径)', expectGan === hourGan,
+        `${dateStr} 23时 夜子时口径校验失败（默认口径，时干应按次日日干起算）`);
     }
   }
 
@@ -152,6 +153,49 @@ function verifyOne(dateStr, hour, gender) {
   }
 }
 
+/**
+ * L2e：子时口径 —— 三档流派各自的日柱/时柱自洽性（独立公式对拍，不依赖库）
+ *   early    早子时：日柱当日 + 时干按「当日日干」
+ *   midnight 夜子时：日柱当日 + 时干按「次日日干」（项目默认）
+ *   late     晚子时：日柱次日 + 时干按「次日日干」
+ * 说明：只校验 23 时出生，其余时辰三档结果必须完全一致（由 L2-子时口径无关性 覆盖）。
+ */
+function verifyZishi(dateStr, gender) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const todayGan = Solar.fromYmdHms(y, m, d, 12, 0, 0).getLunar().getEightChar().getDayGan();
+  const nd = new Date(Date.UTC(y, m - 1, d) + 86400000);
+  const nextGan = Solar.fromYmdHms(nd.getUTCFullYear(), nd.getUTCMonth() + 1, nd.getUTCDate(), 12, 0, 0)
+    .getLunar().getEightChar().getDayGan();
+  const ziGan = g => GAN[(WU_SHU_DUN[g] + 0) % 10] + '子'; // 时支子序号 = 0
+  const EXPECT = {
+    early:    { day: todayGan, shi: ziGan(todayGan) },
+    midnight: { day: todayGan, shi: ziGan(nextGan) },
+    late:     { day: nextGan,  shi: ziGan(nextGan) },
+  };
+  for (const [zishi, exp] of Object.entries(EXPECT)) {
+    const c = buildChart({ dateStr, hour: 23, gender, city: null, sect: { zishi } });
+    check(`L2-子时口径日柱(${zishi})`, c.bazi.pillars.day[0] === exp.day,
+      `${dateStr} ${zishi} 日柱应为${exp.day}，实际${c.bazi.pillars.day[0]}`);
+    check(`L2-子时口径时柱(${zishi})`, c.bazi.pillars.hour === exp.shi,
+      `${dateStr} ${zishi} 时柱应为${exp.shi}，实际${c.bazi.pillars.hour}`);
+  }
+  // 三档口径必须真的分得开（否则等于参数没生效）
+  const e = buildChart({ dateStr, hour: 23, gender, city: null, sect: { zishi: 'early' } }).bazi.pillars.hour;
+  const l = buildChart({ dateStr, hour: 23, gender, city: null, sect: { zishi: 'late' } }).bazi.pillars.day[0];
+  check('L2-子时口径有效性', e !== EXPECT.midnight.shi || l !== EXPECT.midnight.day,
+    `${dateStr} 早子时与夜子时结果相同，zishi 参数疑似未生效`);
+}
+
+/** 非 23 时出生，三档口径结果必须完全一致（口径参数不得误伤普通时辰） */
+function verifyZishiIrrelevant(dateStr, hour, gender) {
+  if (hour === 23 || hour == null) return;
+  const a = buildChart({ dateStr, hour, gender, city: null, sect: { zishi: 'early' } });
+  const b = buildChart({ dateStr, hour, gender, city: null, sect: { zishi: 'late' } });
+  check('L2-子时口径无关性',
+    JSON.stringify(a.bazi.pillars) === JSON.stringify(b.bazi.pillars) && a.ziwei.soul === b.ziwei.soul,
+    `${dateStr} ${hour}时 早子时/晚子时结果不一致，zishi 参数误伤了非子时时辰`);
+}
+
 /** 日柱连续性：连续 N 天日柱序号每天 +1 */
 function verifyDayContinuity(startISO, days) {
   let prev = null, ok = true, badDay = '';
@@ -177,7 +221,10 @@ function main() {
     ['2000-8-16', 14, '男'], ['1995-6-15', 8, '女'], ['1988-11-2', 10, '男'],
     ['1976-3-5', 3, '女'], ['2010-1-15', 23, '男'], ['1962-12-30', 1, '女'],
   ];
-  for (const [d, h, g] of fixed) verifyOne(d, h, g);
+  for (const [d, h, g] of fixed) { verifyOne(d, h, g); verifyZishiIrrelevant(d, h, g); }
+
+  // 固定样例：三档子时口径
+  for (const [d, , g] of fixed) verifyZishi(d, g);
 
   // 随机抽样
   for (let i = 0; i < sampleDays; i++) {
@@ -187,8 +234,11 @@ function main() {
     const d = 1 + Math.floor(Math.random() * dmax);
     const h = Math.floor(Math.random() * 24);
     const g = Math.random() > 0.5 ? '男' : '女';
+    const ds = `${y}-${m}-${d}`;
     try {
-      verifyOne(`${y}-${m}-${d}`, h, g);
+      verifyOne(ds, h, g);
+      verifyZishiIrrelevant(ds, h, g);
+      if (i % 20 === 0) verifyZishi(ds, g); // 子时口径开销较大，抽样 5%
     } catch (e) {
       results.failures.push(`[异常] ${y}-${m}-${d} ${h}时: ${e.message}`);
     }

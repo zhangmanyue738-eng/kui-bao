@@ -1,16 +1,16 @@
 {
   "meta": {
     "dateStr": "2000-8-16",
-    "inputHour": 14,
-    "effectiveHour": 13,
+    "inputHour": 23,
+    "effectiveHour": 23,
     "gender": "男",
-    "city": "深圳",
+    "city": "佳木斯",
     "trueSolar": {
-      "hour": 13,
+      "hour": 23,
       "adjusted": true,
       "boundaryRisk": false,
       "dstApplied": false,
-      "note": "经度114.06，校正 -24 分钟"
+      "note": "经度130.35，校正 +41 分钟"
     },
     "dstMode": "auto",
     "sect": {
@@ -19,14 +19,14 @@
       "school": "ziping"
     },
     "sectStamp": "夜子时 · 子平法 · 闰月按当月 · 南派三合（iztro）",
-    "generatedAt": "2026-09-03T06:55:50.557Z"
+    "generatedAt": "2026-09-03T06:56:15.362Z"
   },
   "bazi": {
     "pillars": {
       "year": "庚辰",
       "month": "甲申",
       "day": "丙午",
-      "hour": "乙未"
+      "hour": "庚子"
     },
     "hourPillarMissing": false,
     "dayMaster": {
@@ -57,22 +57,23 @@
       },
       {
         "pillar": "hour",
-        "gan": "乙",
-        "ganWx": "木",
-        "zhi": "未",
-        "zhiWx": "土"
+        "gan": "庚",
+        "ganWx": "金",
+        "zhi": "子",
+        "zhiWx": "水"
       }
     ],
     "fiveElementsCount": {
-      "金": 2,
-      "木": 2,
+      "金": 3,
+      "木": 1,
       "火": 2,
-      "土": 2
+      "土": 1,
+      "水": 1
     },
     "tenGods": {
       "yearGan": "偏财",
       "monthGan": "偏印",
-      "hourGan": "正印",
+      "hourGan": "偏财",
       "yearZhi": [
         "食神",
         "正印",
@@ -88,16 +89,14 @@
         "伤官"
       ],
       "hourZhi": [
-        "伤官",
-        "劫财",
-        "正印"
+        "正官"
       ]
     },
     "naYin": [
       "白蜡金",
       "泉中水",
       "天河水",
-      "沙中金"
+      "壁上土"
     ],
     "daYun": [
       {
@@ -163,38 +162,38 @@
         "startYear": 2077,
         "endYear": 2086
       }
-    ]
+    ],
+    "zishiNote": "夜子时口径：日柱当日，时干按次日日干"
   },
   "ziwei": {
-    "soul": "巨门",
+    "soul": "廉贞",
     "body": "文昌",
-    "fiveElementsClass": "火六局",
+    "fiveElementsClass": "水二局",
     "palaces": [
       {
-        "name": "父母",
+        "name": "迁移",
         "isBodyPalace": false,
         "majorStars": [
           {
-            "name": "天机",
-            "magnitude": "得",
+            "name": "廉贞",
+            "magnitude": "庙",
             "siHua": ""
-          },
-          {
-            "name": "太阴",
-            "magnitude": "旺",
-            "siHua": "科"
           }
         ],
         "minorStars": [
           {
             "name": "天马",
             "siHua": ""
+          },
+          {
+            "name": "火星",
+            "siHua": ""
           }
         ],
         "adjectiveStars": [
           "解神",
-          "三台",
-          "天贵",
+          "恩光",
+          "封诰",
           "天巫",
           "天厨",
           "阴煞",
@@ -202,37 +201,23 @@
         ]
       },
       {
-        "name": "福德",
-        "isBodyPalace": true,
-        "majorStars": [
-          {
-            "name": "紫微",
-            "magnitude": "旺",
-            "siHua": ""
-          },
-          {
-            "name": "贪狼",
-            "magnitude": "利",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "文昌",
-            "siHua": ""
-          }
-        ],
+        "name": "疾厄",
+        "isBodyPalace": false,
+        "majorStars": [],
+        "minorStars": [],
         "adjectiveStars": [
-          "天刑"
+          "三台",
+          "天刑",
+          "天使"
         ]
       },
       {
-        "name": "田宅",
+        "name": "财帛",
         "isBodyPalace": false,
         "majorStars": [
           {
-            "name": "巨门",
-            "magnitude": "陷",
+            "name": "破军",
+            "magnitude": "旺",
             "siHua": ""
           }
         ],
@@ -242,128 +227,12 @@
             "siHua": ""
           },
           {
-            "name": "地空",
+            "name": "文曲",
             "siHua": ""
           }
         ],
         "adjectiveStars": [
           "华盖"
-        ]
-      },
-      {
-        "name": "官禄",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "天相",
-            "magnitude": "得",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "铃星",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "天喜",
-          "天才",
-          "天空",
-          "孤辰"
-        ]
-      },
-      {
-        "name": "仆役",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "天梁",
-            "magnitude": "庙",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "地劫",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "恩光",
-          "凤阁",
-          "天福",
-          "截路",
-          "蜚廉",
-          "天伤",
-          "年解"
-        ]
-      },
-      {
-        "name": "迁移",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "廉贞",
-            "magnitude": "利",
-            "siHua": ""
-          },
-          {
-            "name": "七杀",
-            "magnitude": "庙",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "天钺",
-            "siHua": ""
-          },
-          {
-            "name": "陀罗",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "天姚",
-          "天寿",
-          "空亡"
-        ]
-      },
-      {
-        "name": "疾厄",
-        "isBodyPalace": false,
-        "majorStars": [],
-        "minorStars": [
-          {
-            "name": "禄存",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "龙池",
-          "旬空",
-          "天使"
-        ]
-      },
-      {
-        "name": "财帛",
-        "isBodyPalace": false,
-        "majorStars": [],
-        "minorStars": [
-          {
-            "name": "火星",
-            "siHua": ""
-          },
-          {
-            "name": "擎羊",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "咸池",
-          "封诰",
-          "月德"
         ]
       },
       {
@@ -372,18 +241,15 @@
         "majorStars": [
           {
             "name": "天同",
-            "magnitude": "平",
+            "magnitude": "庙",
             "siHua": "忌"
           }
         ],
-        "minorStars": [
-          {
-            "name": "左辅",
-            "siHua": ""
-          }
-        ],
+        "minorStars": [],
         "adjectiveStars": [
-          "天虚"
+          "天喜",
+          "天空",
+          "孤辰"
         ]
       },
       {
@@ -392,25 +258,23 @@
         "majorStars": [
           {
             "name": "武曲",
-            "magnitude": "平",
+            "magnitude": "旺",
             "siHua": "权"
           },
           {
-            "name": "破军",
-            "magnitude": "平",
+            "name": "天府",
+            "magnitude": "旺",
             "siHua": ""
           }
         ],
-        "minorStars": [
-          {
-            "name": "文曲",
-            "siHua": ""
-          }
-        ],
+        "minorStars": [],
         "adjectiveStars": [
-          "红鸾",
-          "天官",
-          "天月"
+          "凤阁",
+          "台辅",
+          "天福",
+          "截路",
+          "蜚廉",
+          "年解"
         ]
       },
       {
@@ -419,182 +283,13 @@
         "majorStars": [
           {
             "name": "太阳",
-            "magnitude": "陷",
-            "siHua": "禄"
-          }
-        ],
-        "minorStars": [],
-        "adjectiveStars": [
-          "八座"
-        ]
-      },
-      {
-        "name": "命宫",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "天府",
-            "magnitude": "庙",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "天魁",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "台辅",
-          "天德",
-          "寡宿",
-          "破碎"
-        ]
-      }
-    ],
-    "byName": {
-      "父母": {
-        "name": "父母",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "天机",
             "magnitude": "得",
-            "siHua": ""
+            "siHua": "禄"
           },
           {
             "name": "太阴",
-            "magnitude": "旺",
+            "magnitude": "不",
             "siHua": "科"
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "天马",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "解神",
-          "三台",
-          "天贵",
-          "天巫",
-          "天厨",
-          "阴煞",
-          "天哭"
-        ]
-      },
-      "福德": {
-        "name": "福德",
-        "isBodyPalace": true,
-        "majorStars": [
-          {
-            "name": "紫微",
-            "magnitude": "旺",
-            "siHua": ""
-          },
-          {
-            "name": "贪狼",
-            "magnitude": "利",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "文昌",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "天刑"
-        ]
-      },
-      "田宅": {
-        "name": "田宅",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "巨门",
-            "magnitude": "陷",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "右弼",
-            "siHua": ""
-          },
-          {
-            "name": "地空",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "华盖"
-        ]
-      },
-      "官禄": {
-        "name": "官禄",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "天相",
-            "magnitude": "得",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "铃星",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "天喜",
-          "天才",
-          "天空",
-          "孤辰"
-        ]
-      },
-      "仆役": {
-        "name": "仆役",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "天梁",
-            "magnitude": "庙",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "地劫",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "恩光",
-          "凤阁",
-          "天福",
-          "截路",
-          "蜚廉",
-          "天伤",
-          "年解"
-        ]
-      },
-      "迁移": {
-        "name": "迁移",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "廉贞",
-            "magnitude": "利",
-            "siHua": ""
-          },
-          {
-            "name": "七杀",
-            "magnitude": "庙",
-            "siHua": ""
           }
         ],
         "minorStars": [
@@ -609,14 +304,19 @@
         ],
         "adjectiveStars": [
           "天姚",
-          "天寿",
           "空亡"
         ]
       },
-      "疾厄": {
-        "name": "疾厄",
-        "isBodyPalace": false,
-        "majorStars": [],
+      {
+        "name": "命宫",
+        "isBodyPalace": true,
+        "majorStars": [
+          {
+            "name": "贪狼",
+            "magnitude": "平",
+            "siHua": ""
+          }
+        ],
         "minorStars": [
           {
             "name": "禄存",
@@ -624,20 +324,27 @@
           }
         ],
         "adjectiveStars": [
+          "天贵",
           "龙池",
-          "旬空",
-          "天使"
+          "旬空"
         ]
       },
-      "财帛": {
-        "name": "财帛",
+      {
+        "name": "父母",
         "isBodyPalace": false,
-        "majorStars": [],
-        "minorStars": [
+        "majorStars": [
           {
-            "name": "火星",
+            "name": "天机",
+            "magnitude": "旺",
             "siHua": ""
           },
+          {
+            "name": "巨门",
+            "magnitude": "庙",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [
           {
             "name": "擎羊",
             "siHua": ""
@@ -645,8 +352,167 @@
         ],
         "adjectiveStars": [
           "咸池",
-          "封诰",
           "月德"
+        ]
+      },
+      {
+        "name": "福德",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "紫微",
+            "magnitude": "得",
+            "siHua": ""
+          },
+          {
+            "name": "天相",
+            "magnitude": "得",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [
+          {
+            "name": "左辅",
+            "siHua": ""
+          },
+          {
+            "name": "文昌",
+            "siHua": ""
+          },
+          {
+            "name": "铃星",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "天虚"
+        ]
+      },
+      {
+        "name": "田宅",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "天梁",
+            "magnitude": "陷",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [
+          {
+            "name": "地空",
+            "siHua": ""
+          },
+          {
+            "name": "地劫",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "红鸾",
+          "八座",
+          "天官",
+          "天月"
+        ]
+      },
+      {
+        "name": "官禄",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "七杀",
+            "magnitude": "旺",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [],
+        "adjectiveStars": [
+          "天才",
+          "天寿"
+        ]
+      },
+      {
+        "name": "仆役",
+        "isBodyPalace": false,
+        "majorStars": [],
+        "minorStars": [
+          {
+            "name": "天魁",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "天德",
+          "寡宿",
+          "破碎",
+          "天伤"
+        ]
+      }
+    ],
+    "byName": {
+      "迁移": {
+        "name": "迁移",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "廉贞",
+            "magnitude": "庙",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [
+          {
+            "name": "天马",
+            "siHua": ""
+          },
+          {
+            "name": "火星",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "解神",
+          "恩光",
+          "封诰",
+          "天巫",
+          "天厨",
+          "阴煞",
+          "天哭"
+        ]
+      },
+      "疾厄": {
+        "name": "疾厄",
+        "isBodyPalace": false,
+        "majorStars": [],
+        "minorStars": [],
+        "adjectiveStars": [
+          "三台",
+          "天刑",
+          "天使"
+        ]
+      },
+      "财帛": {
+        "name": "财帛",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "破军",
+            "magnitude": "旺",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [
+          {
+            "name": "右弼",
+            "siHua": ""
+          },
+          {
+            "name": "文曲",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "华盖"
         ]
       },
       "子女": {
@@ -655,18 +521,15 @@
         "majorStars": [
           {
             "name": "天同",
-            "magnitude": "平",
+            "magnitude": "庙",
             "siHua": "忌"
           }
         ],
-        "minorStars": [
-          {
-            "name": "左辅",
-            "siHua": ""
-          }
-        ],
+        "minorStars": [],
         "adjectiveStars": [
-          "天虚"
+          "天喜",
+          "天空",
+          "孤辰"
         ]
       },
       "夫妻": {
@@ -675,25 +538,23 @@
         "majorStars": [
           {
             "name": "武曲",
-            "magnitude": "平",
+            "magnitude": "旺",
             "siHua": "权"
           },
           {
-            "name": "破军",
-            "magnitude": "平",
+            "name": "天府",
+            "magnitude": "旺",
             "siHua": ""
           }
         ],
-        "minorStars": [
-          {
-            "name": "文曲",
-            "siHua": ""
-          }
-        ],
+        "minorStars": [],
         "adjectiveStars": [
-          "红鸾",
-          "天官",
-          "天月"
+          "凤阁",
+          "台辅",
+          "天福",
+          "截路",
+          "蜚廉",
+          "年解"
         ]
       },
       "兄弟": {
@@ -702,92 +563,87 @@
         "majorStars": [
           {
             "name": "太阳",
-            "magnitude": "陷",
+            "magnitude": "得",
             "siHua": "禄"
+          },
+          {
+            "name": "太阴",
+            "magnitude": "不",
+            "siHua": "科"
           }
         ],
-        "minorStars": [],
+        "minorStars": [
+          {
+            "name": "天钺",
+            "siHua": ""
+          },
+          {
+            "name": "陀罗",
+            "siHua": ""
+          }
+        ],
         "adjectiveStars": [
-          "八座"
+          "天姚",
+          "空亡"
         ]
       },
       "命宫": {
         "name": "命宫",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "天府",
-            "magnitude": "庙",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "天魁",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "台辅",
-          "天德",
-          "寡宿",
-          "破碎"
-        ]
-      }
-    },
-    "keyPalaces": {
-      "ming": {
-        "name": "命宫",
-        "isBodyPalace": false,
-        "majorStars": [
-          {
-            "name": "天府",
-            "magnitude": "庙",
-            "siHua": ""
-          }
-        ],
-        "minorStars": [
-          {
-            "name": "天魁",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "台辅",
-          "天德",
-          "寡宿",
-          "破碎"
-        ]
-      },
-      "shen": {
-        "name": "福德",
         "isBodyPalace": true,
         "majorStars": [
           {
-            "name": "紫微",
+            "name": "贪狼",
+            "magnitude": "平",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [
+          {
+            "name": "禄存",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "天贵",
+          "龙池",
+          "旬空"
+        ]
+      },
+      "父母": {
+        "name": "父母",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "天机",
             "magnitude": "旺",
             "siHua": ""
           },
           {
-            "name": "贪狼",
-            "magnitude": "利",
+            "name": "巨门",
+            "magnitude": "庙",
             "siHua": ""
           }
         ],
         "minorStars": [
           {
-            "name": "文昌",
+            "name": "擎羊",
             "siHua": ""
           }
         ],
         "adjectiveStars": [
-          "天刑"
+          "咸池",
+          "月德"
         ]
       },
-      "guanLu": {
-        "name": "官禄",
+      "福德": {
+        "name": "福德",
         "isBodyPalace": false,
         "majorStars": [
+          {
+            "name": "紫微",
+            "magnitude": "得",
+            "siHua": ""
+          },
           {
             "name": "天相",
             "magnitude": "得",
@@ -796,68 +652,94 @@
         ],
         "minorStars": [
           {
+            "name": "左辅",
+            "siHua": ""
+          },
+          {
+            "name": "文昌",
+            "siHua": ""
+          },
+          {
             "name": "铃星",
             "siHua": ""
           }
         ],
         "adjectiveStars": [
-          "天喜",
-          "天才",
-          "天空",
-          "孤辰"
+          "天虚"
         ]
       },
-      "caiBo": {
-        "name": "财帛",
-        "isBodyPalace": false,
-        "majorStars": [],
-        "minorStars": [
-          {
-            "name": "火星",
-            "siHua": ""
-          },
-          {
-            "name": "擎羊",
-            "siHua": ""
-          }
-        ],
-        "adjectiveStars": [
-          "咸池",
-          "封诰",
-          "月德"
-        ]
-      },
-      "fuQi": {
-        "name": "夫妻",
+      "田宅": {
+        "name": "田宅",
         "isBodyPalace": false,
         "majorStars": [
           {
-            "name": "武曲",
-            "magnitude": "平",
-            "siHua": "权"
-          },
-          {
-            "name": "破军",
-            "magnitude": "平",
+            "name": "天梁",
+            "magnitude": "陷",
             "siHua": ""
           }
         ],
         "minorStars": [
           {
-            "name": "文曲",
+            "name": "地空",
+            "siHua": ""
+          },
+          {
+            "name": "地劫",
             "siHua": ""
           }
         ],
         "adjectiveStars": [
           "红鸾",
+          "八座",
           "天官",
           "天月"
         ]
       },
-      "jiE": {
-        "name": "疾厄",
+      "官禄": {
+        "name": "官禄",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "七杀",
+            "magnitude": "旺",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [],
+        "adjectiveStars": [
+          "天才",
+          "天寿"
+        ]
+      },
+      "仆役": {
+        "name": "仆役",
         "isBodyPalace": false,
         "majorStars": [],
+        "minorStars": [
+          {
+            "name": "天魁",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "天德",
+          "寡宿",
+          "破碎",
+          "天伤"
+        ]
+      }
+    },
+    "keyPalaces": {
+      "ming": {
+        "name": "命宫",
+        "isBodyPalace": true,
+        "majorStars": [
+          {
+            "name": "贪狼",
+            "magnitude": "平",
+            "siHua": ""
+          }
+        ],
         "minorStars": [
           {
             "name": "禄存",
@@ -865,18 +747,56 @@
           }
         ],
         "adjectiveStars": [
+          "天贵",
           "龙池",
-          "旬空",
-          "天使"
+          "旬空"
         ]
       },
-      "tianZhai": {
-        "name": "田宅",
+      "shen": {
+        "name": "命宫",
+        "isBodyPalace": true,
+        "majorStars": [
+          {
+            "name": "贪狼",
+            "magnitude": "平",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [
+          {
+            "name": "禄存",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "天贵",
+          "龙池",
+          "旬空"
+        ]
+      },
+      "guanLu": {
+        "name": "官禄",
         "isBodyPalace": false,
         "majorStars": [
           {
-            "name": "巨门",
-            "magnitude": "陷",
+            "name": "七杀",
+            "magnitude": "旺",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [],
+        "adjectiveStars": [
+          "天才",
+          "天寿"
+        ]
+      },
+      "caiBo": {
+        "name": "财帛",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "破军",
+            "magnitude": "旺",
             "siHua": ""
           }
         ],
@@ -886,12 +806,75 @@
             "siHua": ""
           },
           {
-            "name": "地空",
+            "name": "文曲",
             "siHua": ""
           }
         ],
         "adjectiveStars": [
           "华盖"
+        ]
+      },
+      "fuQi": {
+        "name": "夫妻",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "武曲",
+            "magnitude": "旺",
+            "siHua": "权"
+          },
+          {
+            "name": "天府",
+            "magnitude": "旺",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [],
+        "adjectiveStars": [
+          "凤阁",
+          "台辅",
+          "天福",
+          "截路",
+          "蜚廉",
+          "年解"
+        ]
+      },
+      "jiE": {
+        "name": "疾厄",
+        "isBodyPalace": false,
+        "majorStars": [],
+        "minorStars": [],
+        "adjectiveStars": [
+          "三台",
+          "天刑",
+          "天使"
+        ]
+      },
+      "tianZhai": {
+        "name": "田宅",
+        "isBodyPalace": false,
+        "majorStars": [
+          {
+            "name": "天梁",
+            "magnitude": "陷",
+            "siHua": ""
+          }
+        ],
+        "minorStars": [
+          {
+            "name": "地空",
+            "siHua": ""
+          },
+          {
+            "name": "地劫",
+            "siHua": ""
+          }
+        ],
+        "adjectiveStars": [
+          "红鸾",
+          "八座",
+          "天官",
+          "天月"
         ]
       }
     }

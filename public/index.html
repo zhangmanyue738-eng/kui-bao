@@ -110,9 +110,18 @@
 </div>
 
 <script>
-const CITIES = ["北京","上海","广州","深圳","杭州","成都","重庆","武汉","西安","南京","苏州","天津","长沙","郑州","青岛","厦门","福州","沈阳","哈尔滨","乌鲁木齐","拉萨","昆明","贵阳","兰州","海口","香港","澳门","台北"];
-document.getElementById('cities').innerHTML = CITIES.map(c => `<option value="${c}">`).join('');
+// 城市清单的唯一真相在后端 CITY_LONGITUDE（GET /api/cities）。
+// 这里只在后端取不到时兜底，避免前后端各存一份、改了后端前端还显示旧清单。
+const CITIES_FALLBACK = ["北京","上海","广州","深圳","杭州","成都","重庆","武汉","西安","南京","苏州","天津","长沙","郑州","青岛","厦门","福州","沈阳","哈尔滨","乌鲁木齐","拉萨","昆明","贵阳","兰州","海口","香港","澳门","台北"];
+document.getElementById('cities').innerHTML = CITIES_FALLBACK.map(c => `<option value="${c}">`).join('');
 document.getElementById('date').value = '1995-06-15';
+
+// 用后端城市表覆盖兜底清单（服务未启动时静默降级，不挡住页面）
+fetch('/api/cities').then(r => r.ok ? r.json() : null).then(d => {
+  if (!d || !Array.isArray(d.cities) || !d.cities.length) return;
+  document.getElementById('cities').innerHTML =
+    d.cities.map(c => `<option value="${esc(c.name)}">`).join('');
+}).catch(() => { /* 服务未启动，保留兜底清单 */ });
 
 function esc(s){ const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML; }
 
@@ -245,7 +254,76 @@ document.getElementById('go').addEventListener('click', async () => {
   await runInterpret({ ...payload, hour: hourRaw === '' ? null : Number(hourRaw) });
 });
 
-async function runInterpret({ dateStr, hour, gender, city, domains, rectified }) {
+// ───────── 澄清闸（调用前硬门禁） ─────────
+let clarifyAnswers = {};
+
+function renderClarify(payload, pre) {
+  const result = document.getElementById('result');
+  const blocks = pre.blocking.map((b, i) => {
+    const opts = (b.options || []).map(o =>
+      `<button class="opt-btn" data-f="${esc(b.field)}" data-v="${esc(o.value)}"
+         onclick="pickClarify('${esc(b.field)}','${esc(o.value)}')">${esc(o.label)}${o.hint
+           ? `<span style="display:block;font-size:12px;color:var(--muted);margin-top:3px">${esc(o.hint)}</span>` : ''}</button>`
+    ).join('');
+    const extra = (b.input && b.input.type === 'text')
+      ? `<input id="clarify-in-${i}" type="text" list="cities" placeholder="${esc(b.input.placeholder || '')}"
+           style="margin-top:8px;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fdfcfa;font-family:inherit">`
+      : '';
+    return `<div style="margin-bottom:20px">
+      <p style="font-size:15px;line-height:1.8;margin-bottom:8px">${esc(b.question)}</p>
+      <div style="display:flex;flex-direction:column;gap:8px">${opts}</div>${extra}</div>`;
+  }).join('');
+
+  const warns = (pre.warnings || []).map(w => `<p style="font-size:12px;color:var(--muted);margin-top:4px">· ${esc(w)}</p>`).join('');
+  result.innerHTML = `<div class="card">
+    <h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:4px">排盘前需要你确认</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:20px">
+      下面这几项会直接改变排盘结果。系统不替你猜默认值——排盘错误是静默的，报告越流畅就越危险。
+    </p>
+    ${blocks}
+    ${warns ? `<div style="border-top:1px dashed var(--line);padding-top:12px;margin-bottom:16px">${warns}</div>` : ''}
+    <button class="btn" onclick="submitClarify()">确认并继续排盘</button>
+    <button class="btn" style="margin-top:10px;background:#8a8175" onclick="skipClarify()">按默认口径继续（精度下降）</button>
+  </div>`;
+  window._clarifyPayload = payload;
+  window._clarifyBlocking = pre.blocking;
+  clarifyAnswers = {};
+  document.getElementById('go').disabled = false;
+}
+
+function pickClarify(field, value) {
+  clarifyAnswers[field] = value;
+  document.querySelectorAll(`[data-f="${field}"]`).forEach(b => {
+    b.style.borderColor = ''; b.style.background = ''; b.style.color = '';
+  });
+  const btn = document.querySelector(`[data-f="${field}"][data-v="${value}"]`);
+  if (btn) { btn.style.borderColor = 'var(--accent)'; btn.style.background = 'var(--accent-light)'; btn.style.color = 'var(--accent)'; }
+}
+
+function submitClarify() {
+  const blocking = window._clarifyBlocking || [];
+  const confirm = {};
+  blocking.forEach((b, i) => {
+    if (b.field === 'city') {
+      const el = document.getElementById('clarify-in-' + i);
+      const typed = el ? el.value.trim() : '';
+      confirm.city = typed || clarifyAnswers[b.field] || '__none__';
+    } else if (b.field === 'dstMode') {
+      confirm.dstMode = clarifyAnswers[b.field] || 'auto';
+    } else if (b.field.indexOf('sect.') === 0) {
+      confirm.sect = confirm.sect || {};
+      const v = clarifyAnswers[b.field];
+      if (v) confirm.sect[b.field.slice(5)] = v;
+    }
+  });
+  return runInterpret({ ...window._clarifyPayload, confirm });
+}
+
+function skipClarify() {
+  return runInterpret({ ...window._clarifyPayload, force: true });
+}
+
+async function runInterpret({ dateStr, hour, gender, city, domains, rectified, confirm, force }) {
   const btn = document.getElementById('go');
   const result = document.getElementById('result');
   btn.disabled = true;
@@ -253,9 +331,10 @@ async function runInterpret({ dateStr, hour, gender, city, domains, rectified })
   try {
     const resp = await fetch('/api/interpret', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dateStr, hour: hour ?? null, gender, city, domains })
+      body: JSON.stringify({ dateStr, hour: hour ?? null, gender, city, domains, confirm, force })
     });
     const data = await resp.json();
+    if (resp.status === 422 && data.needConfirm) { renderClarify({ dateStr, hour, gender, city, domains, rectified }, data); return; }
     if (data.error) throw new Error(data.error);
     if (data.complianceFailed) {
       result.innerHTML = `<div class="card err"><strong>本次解读未通过合规校验，已拦��不予输出。</strong><br>
@@ -268,6 +347,10 @@ async function runInterpret({ dateStr, hour, gender, city, domains, rectified })
     const p = data.chart.bazi.pillars;
     let html = `<div class="card"><h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:4px">八字四柱</h3>`;
     if (data.chart.meta.trueSolar) html += `<p style="font-size:12px;color:var(--muted)">真太阳时校正：${esc(data.chart.meta.trueSolar.note)}</p>`;
+    if (data.sectStamp) html += `<p style="font-size:12px;color:var(--muted)">排盘口径：${esc(data.sectStamp)}</p>`;
+    const pfw = data.preflightWarnings || [];
+    if (pfw.length) html += `<div style="margin-top:8px;padding:8px 12px;background:#fdf6e8;border:1px solid #ecdcb8;border-radius:8px">
+      ${pfw.map(w => `<p style="font-size:12px;color:#8a6d2f">⚠ ${esc(w)}</p>`).join('')}</div>`;
     html += `<div class="chart-grid">`;
     for (const [name, gz] of [['年柱',p.year],['月柱',p.month],['日柱',p.day],['时柱',p.hour ?? '待定']]) {
       html += `<div class="pillar"><div class="t">${name}</div><div class="gz">${esc(gz)}</div></div>`;
@@ -300,7 +383,8 @@ async function runInterpret({ dateStr, hour, gender, city, domains, rectified })
       }
       html += `</div><p style="font-size:12px;color:var(--muted);margin-top:6px">双术一致 → 置信度高；单术有信号 → 中；双术冲突 → 条件式结论（正文中以「若…则…」呈现）</p>`;
     }
-    html += `</div><div class="card report"><h2 style="letter-spacing:4px;color:var(--accent)">解读报告</h2><p style="font-size:12px;color:var(--muted);margin-bottom:8px">模型：${esc(data.model)} · tokens：${data.usage?.total_tokens ?? '-'} · 知识库条文：${(data.passages && data.passages.length) ? data.passages.length + ' 条' : '未启用'}</p><div class="report-body">${mdLite(data.report)}</div>
+    const stamp = data.sectStamp ? `<p style="margin-top:20px;padding-top:12px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);letter-spacing:1px">本盘口径：${esc(data.sectStamp)}</p>` : '';
+    html += `</div><div class="card report"><h2 style="letter-spacing:4px;color:var(--accent)">解读报告</h2><p style="font-size:12px;color:var(--muted);margin-bottom:8px">模型：${esc(data.model)} · tokens：${data.usage?.total_tokens ?? '-'} · 知识库条文：${(data.passages && data.passages.length) ? data.passages.length + ' 条' : '未启用'}</p><div class="report-body">${mdLite(data.report)}</div>${stamp}
       <div style="margin-top:24px;border-top:1px dashed var(--line);padding-top:16px;text-align:center" id="fb-area">
         <span style="font-size:13px;color:var(--muted);margin-right:10px">这份解读对你有参考价值吗？</span>
         <button class="fb-btn" onclick="sendFeedback('good')">有帮助</button>
@@ -311,7 +395,9 @@ async function runInterpret({ dateStr, hour, gender, city, domains, rectified })
         </div>
       </div></div>`;
     result.innerHTML = html;
-    window._lastPayload = { input: { dateStr, hour: hour ?? null, gender, city, domains, rectified: !!rectified }, report: data.report };
+    window._lastPayload = { input: { dateStr, hour: hour ?? null, gender, city, domains, rectified: !!rectified,
+      sect: data.chart?.meta?.sect, sectStamp: data.sectStamp, trueSolar: data.chart?.meta?.trueSolar,
+      warnings: pfw }, report: data.report };
   } catch (e) {
     result.innerHTML = `<div class="card err">出错了：${esc(e.message)}</div>`;
   } finally {

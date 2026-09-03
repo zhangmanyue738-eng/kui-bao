@@ -9,7 +9,7 @@
   "properties": {
     "meta": {
       "type": "object",
-      "required": ["dateStr", "inputHour", "effectiveHour", "gender", "trueSolar", "generatedAt"],
+      "required": ["dateStr", "inputHour", "effectiveHour", "gender", "trueSolar", "generatedAt", "dstMode", "sect", "sectStamp"],
       "additionalProperties": false,
       "properties": {
         "dateStr": { "type": "string", "pattern": "^\\d{4}-\\d{1,2}-\\d{1,2}$", "description": "公历出生日期" },
@@ -24,8 +24,27 @@
             "hour": { "type": "integer", "minimum": 0, "maximum": 23 },
             "adjusted": { "type": "boolean" },
             "boundaryRisk": { "type": "boolean", "description": "校正后落在时辰交界±10分钟内，建议人工复核" },
+            "dstApplied": { "type": "boolean", "description": "是否已按夏令时扣回 1 小时" },
             "note": { "type": "string" }
           }
+        },
+        "dstMode": {
+          "enum": ["auto", "none"],
+          "description": "auto=按 1986-05-04~1991-09-15 夏令时区间扣回 1 小时；none=用户声明已是标准时间"
+        },
+        "sect": {
+          "type": "object",
+          "required": ["zishi", "leap", "school"],
+          "additionalProperties": false,
+          "properties": {
+            "zishi": { "enum": ["early", "midnight", "late"], "description": "早子时 / 夜子时 / 晚子时；仅 23 时出生有分歧" },
+            "leap": { "enum": ["asIs", "nextMonth"], "description": "农历闰月：按当月 / 按下月" },
+            "school": { "enum": ["ziping"], "description": "八字取格流派" }
+          }
+        },
+        "sectStamp": {
+          "type": "string",
+          "description": "口径落款，如「夜子时 · 子平法 · 闰月按当月 · 南派三合（iztro）」，必须原样出现在报告结尾"
         },
         "generatedAt": { "type": "string", "format": "date-time" }
       }
@@ -34,6 +53,7 @@
       "type": "object",
       "required": ["pillars", "hourPillarMissing", "dayMaster", "pillarsWuxing", "fiveElementsCount", "tenGods", "naYin", "daYun"],
       "additionalProperties": false,
+      "description": "zishiNote 仅在 23 时出生（子时口径有分歧）时出现",
       "properties": {
         "pillars": {
           "type": "object",
@@ -46,6 +66,7 @@
           }
         },
         "hourPillarMissing": { "type": "boolean", "description": "true 时 pillars.hour 必须为 null，下游禁引时柱" },
+        "zishiNote": { "type": "string", "description": "子时口径说明；仅 23 时出生时出现" },
         "dayMaster": {
           "type": "object",
           "required": ["gan", "wuxing"],

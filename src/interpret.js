@@ -102,7 +102,8 @@ function slimChart(chart) {
       }])),
     };
   }
-  return { meta: { dateStr: chart.meta.dateStr, gender: chart.meta.gender, city: chart.meta.city, trueSolar: chart.meta.trueSolar }, bazi, ziwei };
+  return { meta: { dateStr: chart.meta.dateStr, gender: chart.meta.gender, city: chart.meta.city,
+    trueSolar: chart.meta.trueSolar, sect: chart.meta.sect, sectStamp: chart.meta.sectStamp }, bazi, ziwei };
 }
 
 // 合规禁词表（渲染焦虑 / 绝对断言 / 宿命论）
@@ -216,6 +217,7 @@ async function interpret({ chart, domains, synthesis, model: modelOverride }) {
 
   const userMsg = [
     `出生信息：${chart.meta.dateStr} ${chart.meta.inputHour != null ? chart.meta.inputHour + '时' : '时辰未知'} ${chart.meta.gender}性 ${chart.meta.city || '未提供城市'}`,
+    `排盘口径：${chart.meta.sectStamp || '未指定'}`,
     `想了解的领域：${domainText}`,
     '',
     '排盘 JSON（唯一可信数据源）：',

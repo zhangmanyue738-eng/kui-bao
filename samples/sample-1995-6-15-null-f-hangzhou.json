@@ -6,7 +6,14 @@
     "gender": "女",
     "city": "杭州",
     "trueSolar": null,
-    "generatedAt": "2026-08-30T14:47:32.993Z"
+    "dstMode": "auto",
+    "sect": {
+      "zishi": "midnight",
+      "leap": "asIs",
+      "school": "ziping"
+    },
+    "sectStamp": "夜子时 · 子平法 · 闰月按当月 · 南派三合（iztro）",
+    "generatedAt": "2026-09-03T06:57:00.881Z"
   },
   "bazi": {
     "pillars": {
