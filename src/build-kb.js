@@ -38,7 +38,9 @@ function extractZiweiClassics() {
       let t;
       while ((t = textRe.exec(m[2])) !== null) paras.push(t[1].replace(/\\'/g, "'").trim());
       for (let i = 0; i < paras.length; i += 2) {
-        push(`《${bookTitle}》${chTitle}`, 'ziwei', 'public_domain', paras.slice(i, i + 2).join('\n'));
+        // 整书抽取时书级 title 会被章节正则捕获，chTitle === bookTitle，拼出来就是《骨髓赋》骨髓赋
+        push(chTitle === bookTitle ? `《${bookTitle}》` : `《${bookTitle}》${chTitle}`,
+          'ziwei', 'public_domain', paras.slice(i, i + 2).join('\n'));
       }
     }
   }
