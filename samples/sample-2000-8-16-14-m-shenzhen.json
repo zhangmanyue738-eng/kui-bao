@@ -19,7 +19,7 @@
       "school": "ziping"
     },
     "sectStamp": "夜子时 · 子平法 · 闰月按当月 · 南派三合（iztro）",
-    "generatedAt": "2026-09-03T06:55:50.557Z"
+    "generatedAt": "2026-09-03T08:30:56.445Z"
   },
   "bazi": {
     "pillars": {
@@ -163,11 +163,18 @@
         "startYear": 2077,
         "endYear": 2086
       }
-    ]
+    ],
+    "daYunDirection": "顺"
   },
   "ziwei": {
     "soul": "巨门",
     "body": "文昌",
+    "mingZhu": "巨门",
+    "shenZhu": "文昌",
+    "mingGongBranch": "丑",
+    "mingGongStars": [
+      "天府"
+    ],
     "fiveElementsClass": "火六局",
     "palaces": [
       {

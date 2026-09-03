@@ -240,6 +240,31 @@ function resolveZishi(dateStr, hourOrNull, zishi) {
   return { dateStr, hour: 23, note: '夜子时口径：日柱当日，时干按次日日干' };
 }
 
+const TIAN_GAN_LIST = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+const DI_ZHI_LIST = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+
+/**
+ * 大运顺逆：两条互不依赖的路径都必须给出同一答案才落值。
+ *   路径 A：从 daYun 第一步与月柱比较（顺排则干支各进一位）
+ *   路径 B：标准规则「阳年男顺女逆、阴年女顺男逆」
+ * 不一致时返回 null —— 宁可不给，也绝不静默写个错的值下去。
+ *
+ * 为什么要显式算：bench 实测模型判断大运顺逆的正确率仅 2/7（29%，低于瞎猜），
+ * 它有「一律答逆」的强先验。所以这个字段必须由排盘层算好喂给模型，
+ * 不能让模型自己推 —— 否则报告里凡涉及大运顺序的表述大概率是错的。
+ */
+function daYunDirection(daYun, monthPillar, yearGan, gender) {
+  if (!daYun || daYun.length < 2 || !daYun[1] || !daYun[1].ganzhi || !monthPillar) return null;
+  const f = daYun[1].ganzhi;
+  const ganFwd = TIAN_GAN_LIST.indexOf(f[0]) === (TIAN_GAN_LIST.indexOf(monthPillar[0]) + 1) % 10;
+  const zhiFwd = DI_ZHI_LIST.indexOf(f[1]) === (DI_ZHI_LIST.indexOf(monthPillar[1]) + 1) % 12;
+  if (ganFwd !== zhiFwd) return null;                 // 干支走向自相矛盾，不猜
+  const byData = ganFwd ? '顺' : '逆';
+  const yang = '甲丙戊庚壬'.includes(yearGan);
+  const byRule = (yang === (gender === '男')) ? '顺' : '逆';
+  return byData === byRule ? byData : null;
+}
+
 function buildBazi(dateStr, hourOrNull, gender, sect = {}) {
   const s = normalizeSect(sect);
   const rz = resolveZishi(dateStr, hourOrNull, s.zishi);
@@ -281,6 +306,8 @@ function buildBazi(dateStr, hourOrNull, gender, sect = {}) {
     },
     naYin: [ec.getYearNaYin(), ec.getMonthNaYin(), ec.getDayNaYin(), hourOrNull != null ? ec.getTimeNaYin() : null],
     daYun,
+    // 大运顺逆：由排盘层定死，模型自己推会错（实测 29% 正确率，且有「一律答逆」的强先验）
+    daYunDirection: daYunDirection(daYun, `${gan[1]}${zhi[1]}`, gan[0], gender),
     zishiNote: rz.note || undefined,
   };
 }
@@ -308,8 +335,22 @@ function buildZiwei(dateStr, hour, gender, sect = {}) {
   for (const p of palaces) byName[p.name] = p;
   // 兼容 iztro「官禄」与习惯称呼「官禄宫」两种命名
   const pick = n => byName[n] || byName[n.replace(/宫$/, '')];
+
+  // ⚠️ 术语坑（2026-09-03 实测确认）：iztro 的 `ast.soul` / `ast.body` 是**命主 / 身主**，
+  // 不是命宫里的主星。源码为证：astro.js 里 soul = earthlyBranches[命宫地支].soul，
+  // 即按口诀「子贪狼、丑巨门、寅禄存、卯文曲…」查表得出的数据，跟命宫坐哪颗星无关。
+  // iztro 自己的类型注释把它写成「命宫主星」是不严谨的，照抄会酿成系统性误读：
+  // 曾把它当命宫主星喂给 LLM，模型于是拿命主星去讲命宫特质。
+  // → 对外一律用 mingZhu / shenZhu / mingGongStars 这三个名字，不要把 soul/body 暴露出去。
+  const ming = pick('命宫');
+  const mingPalace = ast.palaces.find(p => p.name === '命宫');   // 取命宫地支要用 iztro 原对象
   return {
+    // 保留 iztro 原字段名仅为向后兼容（verify-chart 对拍在用），新代码不要用
     soul: ast.soul, body: ast.body,
+    mingZhu: ast.soul,                                  // 命主（按命宫地支查表）
+    shenZhu: ast.body,                                  // 身主（按生年地支查表）
+    mingGongBranch: mingPalace ? mingPalace.earthlyBranch : null,  // 命宫地支
+    mingGongStars: ming ? ming.majorStars.map(x => x.name) : [],   // 命宫内主星（0~3 颗；0 颗即空宫）
     fiveElementsClass: ast.fiveElementsClass,
     palaces, byName,
     keyPalaces: {

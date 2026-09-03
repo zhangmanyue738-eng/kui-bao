@@ -19,7 +19,7 @@
       "school": "ziping"
     },
     "sectStamp": "夜子时 · 子平法 · 闰月按当月 · 南派三合（iztro）",
-    "generatedAt": "2026-09-03T06:56:15.362Z"
+    "generatedAt": "2026-09-03T08:30:56.471Z"
   },
   "bazi": {
     "pillars": {
@@ -163,11 +163,18 @@
         "endYear": 2086
       }
     ],
+    "daYunDirection": "顺",
     "zishiNote": "夜子时口径：日柱当日，时干按次日日干"
   },
   "ziwei": {
     "soul": "廉贞",
     "body": "文昌",
+    "mingZhu": "廉贞",
+    "shenZhu": "文昌",
+    "mingGongBranch": "申",
+    "mingGongStars": [
+      "贪狼"
+    ],
     "fiveElementsClass": "水二局",
     "palaces": [
       {

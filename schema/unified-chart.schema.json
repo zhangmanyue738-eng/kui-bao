@@ -51,7 +51,7 @@
     },
     "bazi": {
       "type": "object",
-      "required": ["pillars", "hourPillarMissing", "dayMaster", "pillarsWuxing", "fiveElementsCount", "tenGods", "naYin", "daYun"],
+      "required": ["pillars", "hourPillarMissing", "dayMaster", "pillarsWuxing", "fiveElementsCount", "tenGods", "naYin", "daYun", "daYunDirection"],
       "additionalProperties": false,
       "description": "zishiNote 仅在 23 时出生（子时口径有分歧）时出现",
       "properties": {
@@ -116,6 +116,11 @@
               "endYear": { "type": "integer" }
             }
           }
+        },
+        "daYunDirection": {
+          "type": ["string", "null"],
+          "enum": ["顺", "逆", null],
+          "description": "大运顺逆，由排盘层两条独立路径交叉校验后确定；null 表示两条路径不一致（宁可不给也不写错）。模型必须以此为准，不得自行按年干阴阳推算——bench 实测模型自推正确率仅 2/7（29%，低于瞎猜）"
         }
       }
     },
@@ -140,11 +145,19 @@
     },
     "ziweiFull": {
       "type": "object",
-      "required": ["soul", "body", "fiveElementsClass", "palaces", "byName", "keyPalaces"],
+      "required": ["soul", "body", "mingZhu", "shenZhu", "mingGongBranch", "mingGongStars", "fiveElementsClass", "palaces", "byName", "keyPalaces"],
       "additionalProperties": false,
       "properties": {
-        "soul": { "type": "string", "description": "命主" },
-        "body": { "type": "string", "description": "身主" },
+        "soul": { "type": "string", "description": "命主（iztro 原字段名，已废弃；新代码请用 mingZhu）" },
+        "body": { "type": "string", "description": "身主（iztro 原字段名，已废弃；新代码请用 shenZhu）" },
+        "mingZhu": { "type": "string", "description": "命主：按命宫地支查表所得（子贪狼、丑巨门、寅禄存…），与命宫坐哪颗星无关" },
+        "shenZhu": { "type": "string", "description": "身主：按生年地支查表所得" },
+        "mingGongBranch": { "type": ["string", "null"], "description": "命宫地支" },
+        "mingGongStars": {
+          "type": "array",
+          "description": "命宫内主星（0~3 颗；0 颗即空宫）。注意：这不是命主，命主看 mingZhu",
+          "items": { "type": "string" }
+        },
         "fiveElementsClass": { "type": "string", "description": "五行局，如 火六局" },
         "palaces": {
           "type": "array",

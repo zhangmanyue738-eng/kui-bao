@@ -32,7 +32,9 @@ const COMMON_RULES = `【铁律】
 5. 结论措辞要克制：官星旺就说"官星旺"，不得自行推成"必成大器"。
 
 【固定结构】
-一、命盘速览（3-5句，只复述排盘事实：日主、身强身弱、喜用神、命宫主星、生年四化，不解读）
+一、命盘速览（3-5句，只复述排盘事实：日主、身强身弱、喜用神、命主与命宫主星、生年四化，不解读）
+   注意术语：mingZhu＝命主（按命宫地支查表），mingGongStars＝命宫里坐的主星，两者不是一回事，不要混用
+   大运顺逆以 JSON 的 daYunDirection 为准（顺/逆），**不要自行按年干阴阳推算**
 二、各领域解读（每领域 2-4 条论断，每条论断严格用五行格式：
     【结论】一句话
     【盘面依据】八字：…；紫微：…（引用排盘 JSON 原值）
@@ -87,13 +89,22 @@ function slimChart(chart) {
     dayMaster: chart.bazi.dayMaster, fiveElementsCount: chart.bazi.fiveElementsCount,
     tenGods: chart.bazi.tenGods, naYin: chart.bazi.naYin,
     daYun: chart.bazi.daYun.slice(1, 6),
+    // 大运顺逆由排盘层给死：bench 实测模型自推的正确率只有 2/7（29%，低于瞎猜），
+    // 它有「一律答逆」的强先验。给了这个字段，模型就不必（也不该）自己去推。
+    daYunDirection: chart.bazi.daYunDirection || null,
   };
   let ziwei;
   if (chart.ziwei.skipped) {
     ziwei = { skipped: true, reason: chart.ziwei.reason };
   } else {
     ziwei = {
-      soul: chart.ziwei.soul, body: chart.ziwei.body,
+      // 术语必须与数据一致：mingZhu（命主）是按命宫地支查表得来的星，跟命宫里坐哪颗星无关；
+      // mingGongStars 才是命宫内主星。以前把 iztro 的 soul 直接叫「命宫主星」喂进来，
+      // 模型于是拿命主星去讲命宫特质 —— 静默的系统性误读，肉眼看报告看不出来。
+      mingZhu: chart.ziwei.mingZhu,
+      shenZhu: chart.ziwei.shenZhu,
+      mingGongBranch: chart.ziwei.mingGongBranch,
+      mingGongStars: chart.ziwei.mingGongStars,
       fiveElementsClass: chart.ziwei.fiveElementsClass,
       keyPalaces: Object.fromEntries(Object.entries(chart.ziwei.keyPalaces).map(([k, p]) => [k, p && {
         palace: p.name,
