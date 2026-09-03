@@ -108,13 +108,28 @@ const BAZI_FILE_MAP = {
   'liang-xiangrun-rule-selector': { book: '梁湘润规则择用', pub: false },
   'zhen-taiyangshi': { book: '真太阳时', pub: false },
   'bazi-sop': { book: '八字分析流程', pub: false },
+  'shishen-geju': { book: '十神格局', pub: false },
 };
+
+/**
+ * 未登记文件的兜底：以前这里直接 `{ book: key }`，于是拼音文件名
+ * （shishen-geju）被当成出处印进了报告的【知识出处】——30 条条目中招，
+ * 而「出处必须是真实可查的书名篇名」是项目的硬门禁之一，这条链上不能出现机器名。
+ * 现在改成抛错：宁可构建失败，也不静默产出一个假出处。
+ * doctor 的「出处命名」检查会提前拦下未登记的新文件。
+ */
+function unregistered(fileKey) {
+  throw new Error(
+    `knowledge/bazi-classics/references/${fileKey}.md 未在 BAZI_FILE_MAP 登记。` +
+    `请在 src/build-kb.js 的 BAZI_FILE_MAP 里补上中文书名（` +
+    `如 '${fileKey}': { book: '中文书名', pub: false }），否则拼音文件名会直接变成知识出处。`);
+}
 
 function extractBaziMarkdown() {
   if (!fs.existsSync(BAZI_DIR)) return;
   for (const f of fs.readdirSync(BAZI_DIR).filter(f => f.endsWith('.md'))) {
     const key = f.replace(/\.md$/, '');
-    const meta = BAZI_FILE_MAP[key] || { book: key, pub: false };
+    const meta = BAZI_FILE_MAP[key] || unregistered(key);
     const raw = fs.readFileSync(path.join(BAZI_DIR, f), 'utf8');
     // 按 ## 或 ### 切分（粒度更细，检索更准）
     const sections = raw.split(/^#{2,3}\s+/m).slice(1);

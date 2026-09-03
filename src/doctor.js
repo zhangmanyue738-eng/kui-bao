@@ -335,6 +335,21 @@ function checkKnowledge() {
   else if (lines.length < 100) warn('知识库', 'kb.jsonl', `仅 ${lines.length} 条，偏少`, 'npm run kb');
   else ok('知识库', 'kb.jsonl', `${lines.length} 条（${tStr}；${lStr}）`);
 
+  // 出处命名：拼音文件名不能出现在知识出处里。
+  // 踩过一次：shishen-geju.md 没登记在 BAZI_FILE_MAP，build-kb 兜底成 `{book: key}`，
+  // 于是 30 条条目的出处变成「八字断法·shishen-geju·十神定义」，直接印进报告的
+  // 【知识出处】——而「出处必须是真实可查的书名篇名」是本项目的硬门禁。
+  // build-kb.js 现在对未登记文件直接抛错，这里再兜一道，防止有人改回兜底逻辑。
+  const PINYIN_SLUG = /[a-z]{3,}(-[a-z]{2,})+/;
+  const slugHit = lines.map(l => { try { return JSON.parse(l); } catch { return null; } })
+    .filter(o => o && PINYIN_SLUG.test(o.source || '')).map(o => o.id);
+  if (slugHit.length) {
+    fail('知识库', '出处命名', `${slugHit.length} 条出处的书名是拼音文件名（如 ${slugHit.slice(0, 3).join('、')}）`,
+      '在 src/build-kb.js 的 BAZI_FILE_MAP 补上中文书名后 npm run kb 重建');
+  } else {
+    ok('知识库', '出处命名', '无拼音文件名混入出处');
+  }
+
   // 与 knowledge/ 源文件是否同步
   const src = newestMtimeUnder(path.join(ROOT, 'knowledge'), ['.md', '.json', '.txt']);
   const kbMt = fs.statSync(kbPath).mtimeMs;
@@ -622,6 +637,70 @@ function checkBench() {
   }
 }
 
+/**
+ * 第 12 组：报告导出（P1-2）
+ *
+ * 这里刻意**只做内存级校验，不落盘、不调外部命令**——doctor 要秒级返回，
+ * 而 zip 完整性这种事跑一次 unzip 就要几十毫秒还依赖系统工具。
+ * 更彻底的校验（macOS textutil 能否解析、内容对不对）在
+ * `node tools/report-check.js`，那是要「改了 report.js 才跑」的重检查。
+ */
+function checkExport() {
+  let buildDocx;
+  try {
+    ({ buildDocx } = require(path.join(ROOT, 'src', 'report.js')));
+  } catch (e) {
+    fail('报告导出', '模块可加载', `require 失败：${e.message}`, '检查 src/report.js 语法');
+    return;
+  }
+
+  // ① 生成 + zip 结构（部件名在 zip 里是明文，直接搜字节即可，不必真解压）
+  try {
+    const buf = buildDocx({
+      report: '# 一、命盘速览\n\n日主丙火。\n\n### 事业\n\n【结论】官星透出。\n【置信度】中\n\n- 宜深耕\n\n---\n\n—— 免责声明。',
+      meta: { dateStr: '2000-8-16', hour: 14, gender: '男', city: '深圳', trueSolar: true, sectStamp: '子时=midnight · 子平' },
+    });
+    const zipOk = buf.slice(0, 2).toString() === 'PK';
+    const parts = ['[Content_Types].xml', 'word/document.xml', 'word/styles.xml', '_rels/.rels']
+      .filter(p => !buf.includes(Buffer.from(p, 'utf8')));
+    if (!zipOk) {
+      fail('报告导出', 'DOCX 生成', '产物不是合法 zip（缺少 PK 签名）', '检查 src/report.js 的 zip() 打包实现');
+    } else if (parts.length) {
+      fail('报告导出', 'DOCX 生成', `缺少部件：${parts.join('、')}`, 'Content_Types 声明与实际部件必须一一对应');
+    } else {
+      ok('报告导出', 'DOCX 生成', `${buf.length} 字节，zip 与部件齐全`);
+    }
+  } catch (e) {
+    fail('报告导出', 'DOCX 生成', `生成失败：${e.message}`, '运行 node tools/report-check.js 看详细自检');
+  }
+
+  // ② 前端导出 UI：三个部件缺一个，用户那边的按钮就是死的或导出来没样式
+  let html = '';
+  try {
+    html = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
+  } catch (e) {
+    fail('报告导出', '前端导出 UI', `读不到 public/index.html：${e.message}`);
+    return;
+  }
+  const missing = [
+    ['导出按钮', "onclick=\"exportDocx(this)\""],
+    ['打印按钮', "onclick=\"printReport()\""],
+    ['打印样式表', '@media print'],
+  ].filter(([, needle]) => !html.includes(needle)).map(([label]) => label);
+  missing.length
+    ? fail('报告导出', '前端导出 UI', `缺失：${missing.join('、')}`, '导出栏与打印样式在 public/index.html 里，别只加了按钮忘了样式')
+    : ok('报告导出', '前端导出 UI', '导出按钮 + 打印样式表就位');
+
+  // ③ 服务端的导出路由（前端按钮点下去得有人接）
+  let server = '';
+  try {
+    server = fs.readFileSync(path.join(ROOT, 'src', 'server.js'), 'utf8');
+  } catch { /* 读不到就是下面判失败 */ }
+  server.includes("'/api/report/export'")
+    ? ok('报告导出', '导出路由', '/api/report/export 已注册')
+    : fail('报告导出', '导出路由', "src/server.js 里找不到 /api/report/export", '前端按钮会 404');
+}
+
 // =====================================================================
 // 输出
 // =====================================================================
@@ -676,6 +755,7 @@ async function main() {
   checkSmoke();
   checkSessions();
   checkBench();
+  checkExport();
   await checkLLM();
   await checkService();
 

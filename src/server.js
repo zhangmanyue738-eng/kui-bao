@@ -12,6 +12,7 @@ const { interpret } = require('./interpret.js');
 const rect = require('./rectify.js');
 const { checkPreflight, applyConfirmations } = require('./preflight.js');
 const sessions = require('./sessions.js');
+const { buildDocx, suggestName } = require('./report.js');
 
 // 定盘会话（内存态，自用规模足够；重启即失效）
 const rectifySessions = new Map();
@@ -292,6 +293,51 @@ async function route(req, res) {
           sectStamp: chart.meta.sectStamp, preflightWarnings: pre.warnings });
       } catch (e) {
         return json(res, 500, { error: e.message });
+      }
+    });
+    return;
+  }
+
+  // ── 报告导出（P1-2）：POST /api/report/export
+  // 两种入参：① 传 sessionId，从归档里取（历史报告也能导出）
+  //          ② 传 report + meta，导出刚生成但还没归档的
+  // PDF 不走这条路：二进制 PDF 必须嵌入中文字体，改由前端 window.print() 走系统打印。
+  if (req.method === 'POST' && req.url === '/api/report/export') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const { sessionId, report, meta, format } = JSON.parse(body || '{}');
+        if (format && format !== 'docx') {
+          return json(res, 400, { error: `暂不支持导出 ${format}；PDF 请用前端「打印 / 存为 PDF」` });
+        }
+
+        let text = report;
+        let m = meta || {};
+        if (sessionId) {
+          const s = sessions.getSession(sessionId);
+          if (!s) return json(res, 404, { error: '归档记录不存在' });
+          text = s.report;
+          m = { dateStr: s.input && s.input.dateStr, hour: s.input && s.input.hour,
+            gender: s.input && s.input.gender, city: s.input && s.input.city,
+            trueSolar: s.chart && s.chart.meta && s.chart.meta.trueSolar,
+            sectStamp: s.chart && s.chart.meta && s.chart.meta.sectStamp };
+        }
+
+        const buf = buildDocx({ report: text, meta: m });
+        const fname = encodeURIComponent(suggestName(m)) + '.docx';
+        // 中文文件名必须给 filename*（RFC 5987），否则各浏览器编码不一致会变乱码
+        res.writeHead(200, {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Length': buf.length,
+          'Content-Disposition': `attachment; filename="report.docx"; filename*=UTF-8''${fname}`,
+        });
+        res.end(buf);
+      } catch (e) {
+        // 头可能已经写出去了，这里不能再 writeHead，否则 ERR_HTTP_HEADERS_SENT 带崩进程
+        if (!res.headersSent) return json(res, 400, { error: e.message });
+        console.error('[导出失败]', e);
+        res.end();
       }
     });
     return;

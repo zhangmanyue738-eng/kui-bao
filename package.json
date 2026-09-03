@@ -18,7 +18,8 @@
     "ragcheck": "node tools/rag-check.js",
     "rq": "node tools/retrieval-quality.js",
     "rq:base": "LEGACY=1 node tools/retrieval-quality.js",
-    "test": "npm run schema && npm run verify && npm run crosscheck && npm run bench -- --verify",
+    "reportcheck": "node tools/report-check.js",
+    "test": "npm run schema && npm run bench -- --verify && npm run reportcheck && npm run verify && npm run crosscheck",
     "test:full": "npm test && npm run stability",
     "sessions": "node src/sessions.js",
     "doctor": "node src/doctor.js"

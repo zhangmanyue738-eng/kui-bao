@@ -52,6 +52,27 @@
   .err { color: #b03a2e; background: #fdeeec; border: 1px solid #f0c4bd; border-radius: 8px; padding: 12px 16px; font-size: 14px; }
   .disclaimer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; border-top: 1px solid var(--line); padding-top: 20px; letter-spacing: 1px; }
 
+  /* ───── 报告导出（P1-2）───── */
+  .export-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 2px; }
+  .export-bar .hint { font-size: 12px; color: var(--muted); }
+
+  /* 打印 / 存为 PDF：只留报告本体与盘面，收起所有交互件。
+     PDF 刻意走系统打印而不是服务端生成 —— 二进制 PDF 必须嵌入中文字体（5~10MB 起步），
+     服务端生成就得装 PDFKit / wkhtmltopdf；系统打印出的是**矢量文本**，
+     可选中、可搜索、无字体坑，质量反而更好。 */
+  @media print {
+    body { background: #fff; color: #000; font-size: 11pt; line-height: 1.6; }
+    .wrap { max-width: none; padding: 0; }
+    header, #form-card, .hist-toggle, .drawer, .drawer-mask,
+    #fb-area, .export-bar, .notice, .disclaimer { display: none !important; }
+    .card { border: none; padding: 0; margin: 0 0 14px; box-shadow: none; }
+    .report h2, .report h3 { color: #000; }
+    .report { page-break-before: always; }
+    .card, .report-body p { page-break-inside: avoid; }
+    .conf-chip, .palace, .pillar, .fb-btn { border-color: #999 !important; background: #fff !important; color: #000 !important; }
+    .notice, .disclaimer { display: none !important; }
+  }
+
   /* ───── 历史档案面板 ───── */
   .hist-toggle { position: fixed; top: 20px; right: 20px; padding: 9px 18px; background: var(--card); color: var(--ink);
     border: 1px solid var(--line); border-radius: 999px; font-size: 13px; cursor: pointer; font-family: inherit;
@@ -109,7 +130,7 @@
     <p>八字 · 紫微斗数 双术排盘 / 排盘由确定性算法计算，解读由 AI 受约束生成</p>
   </header>
 
-  <div class="card">
+  <div class="card" id="form-card">
     <div class="form-grid">
       <div class="field">
         <label>出生日期（公历）</label>
@@ -488,7 +509,14 @@ function renderResultBody(data, opts = {}) {
     const archived = opts.sessionId
       ? `<p style="font-size:12px;color:var(--muted);margin-top:10px">评价与补充会写回档案 <code>${esc(opts.sessionId)}</code>，日后可按「不准」检索复盘。</p>`
       : '';
-    html += `</div><div class="card report"><h2 style="letter-spacing:4px;color:var(--accent)">解读报告</h2><p style="font-size:12px;color:var(--muted);margin-bottom:8px">模型：${esc(data.model || '-')} · tokens：${data.usage?.total_tokens ?? '-'} · 知识库条文：${(data.passages && data.passages.length) ? data.passages.length + ' 条' : '未启用'}</p><div class="report-body">${mdLite(data.report)}</div>${stamp}
+    // 导出栏。放在报告卡片里而不是顶部：新解读与历史档案共用 renderResultBody，
+    // 放这里两边都自动带上，不必维护两套。
+    const exportBar = `<div class="export-bar">
+      <button class="mini-btn" onclick="exportDocx(this)">导出 DOCX</button>
+      <button class="mini-btn" onclick="printReport()">打印 / 存为 PDF</button>
+      <span class="hint">PDF 走系统打印（矢量文本，可选中搜索）；DOCX 服务端生成</span>
+    </div>`;
+    html += `</div><div class="card report"><h2 style="letter-spacing:4px;color:var(--accent)">解读报告</h2><p style="font-size:12px;color:var(--muted);margin-bottom:8px">模型：${esc(data.model || '-')} · tokens：${data.usage?.total_tokens ?? '-'} · 知识库条文：${(data.passages && data.passages.length) ? data.passages.length + ' 条' : '未启用'}</p>${exportBar}<div class="report-body">${mdLite(data.report)}</div>${stamp}
       <div style="margin-top:24px;border-top:1px dashed var(--line);padding-top:16px;text-align:center" id="fb-area">
         <span style="font-size:13px;color:var(--muted);margin-right:10px">这份解读对你有参考价值吗？</span>
         <button class="fb-btn" onclick="sendFeedback('good')">有帮助</button>
@@ -671,6 +699,62 @@ function toast(msg) {
     'padding:9px 20px;border-radius:999px;font-size:13px;z-index:99;box-shadow:0 4px 14px rgba(0,0,0,.18)';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1800);
+}
+
+// ───────────────── 报告导出（P1-2）─────────────────
+
+/**
+ * 导出 DOCX。
+ * 优先传 sessionId 让服务端从归档里取 —— 归档存的是**当时那份**完整报告，
+ * 比前端内存里的更可靠（_lastPayload 刷新就没了）。没归档时才退回用前端这份。
+ */
+async function exportDocx(btn) {
+  const p = window._lastPayload || {};
+  const inp = p.input || {};
+  if (!window._lastSessionId && !p.report) { toast('还没有可导出的报告'); return; }
+
+  const b = btn || {};
+  const orig = b.textContent;
+  b.disabled = true; b.textContent = '导出中…';
+  try {
+    const resp = await fetch('/api/report/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: window._lastSessionId || null,
+        report: p.report || '',
+        meta: { dateStr: inp.dateStr, hour: inp.hour, gender: inp.gender, city: inp.city,
+                trueSolar: inp.trueSolar, sectStamp: inp.sectStamp },
+      }),
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.error || ('HTTP ' + resp.status));
+    }
+    // 从 Content-Disposition 里取服务端给的中文文件名，别在前端拼——拼错编码就是一串乱码
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename\*=UTF-8''(.+)$/);
+    const fname = m ? decodeURIComponent(m[1]) : '命理报告.docx';
+    const url = URL.createObjectURL(await resp.blob());
+    const a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast('已导出 ' + fname);
+  } catch (e) {
+    toast('导出失败：' + e.message);
+  } finally {
+    b.disabled = false; b.textContent = orig || '导出 DOCX';
+  }
+}
+
+/**
+ * 打印 / 存为 PDF。走系统打印而不是服务端生成：
+ * 二进制 PDF 必须嵌入中文字体，服务端得装 PDFKit/wkhtmltopdf；
+ * 系统打印出的是矢量文本，可选中可搜索，还没有字体坑。
+ */
+function printReport() {
+  if (!document.querySelector('.report-body')) { toast('还没有可打印的报告'); return; }
+  window.print();
 }
 
 // 页面加载时先把角标取回来，别让人以为没有历史
