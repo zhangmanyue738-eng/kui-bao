@@ -32,6 +32,32 @@ const TEN_GOD_EXPAND = {
   正印: ['印'], 偏印: ['印'], 比肩: ['比劫'], 劫财: ['比劫'], 食神: ['食伤'], 伤官: ['食伤'],
 };
 
+/**
+ * 取星曜名：兼容 {name} 对象与 "天府[庙](禄)" 字符串两种形态。
+ *
+ * 踩过的坑：slimChart 为省 token 把星曜压成字符串（带庙旺/四化后缀），
+ * 而这里原本按 s.name 取 —— 字符串没有 .name，于是紫微侧 44 个检索词静默归零，
+ * 只剩命主/身主/五行局 3 个词在撑，直接表现为 RAG 降级与紫微侧检索质量低。
+ * 不报错、不掉异常，只有把词打出来才看得见。
+ */
+function starName(s) {
+  if (!s) return null;
+  if (typeof s === 'string') {
+    return s.replace(/\[[^\]]*\]/g, '').replace(/\([^)]*\)/g, '').trim() || null;
+  }
+  return s.name || null;
+}
+
+/** 取四化：对象读 siHua 字段，字符串从 "(禄)" 里剥 */
+function starSiHua(s) {
+  if (!s) return null;
+  if (typeof s === 'string') {
+    const m = s.match(/\(([^)]+)\)/);
+    return m ? m[1] : null;
+  }
+  return s.siHua || null;
+}
+
 /** 从 slimChart 提取检索词 */
 function extractQueryTerms(chart, domains) {
   const terms = new Set();
@@ -58,16 +84,25 @@ function extractQueryTerms(chart, domains) {
   // 紫微星曜与宫位（兼容完整 chart 与 slimChart 两种结构）
   const zw = chart.ziwei;
   if (zw && !zw.skipped) {
+    // slimChart 里 keyPalaces 用 palace 键、星曜是字符串（"天府[庙](禄)"）；
+    // 完整 chart 里用 name 键、星曜是对象 {name, siHua}。两种形态都要能吃。
     const palaces = zw.palaces || Object.values(zw.keyPalaces || {}).filter(Boolean);
     for (const p of palaces) {
-      if (p.name) terms.add(p.name);
+      const pname = p.name || p.palace;
+      if (pname) terms.add(pname);
       for (const s of (p.majorStars || [])) {
-        terms.add(s.name);
-        if (s.siHua) terms.add('化' + s.siHua);
+        const n = starName(s);
+        if (n) terms.add(n);
+        const si = starSiHua(s);
+        if (si) terms.add('化' + si);
       }
-      for (const s of (p.minorStars || [])) terms.add(s.name);
+      for (const s of (p.minorStars || [])) {
+        const n = starName(s);
+        if (n) terms.add(n);
+      }
     }
-    for (const k of ['soul', 'body', 'fiveElementsClass']) if (zw[k]) terms.add(zw[k]);
+    // 用语义化字段名；命主/身主同样是可检索的盘面特征（KB 里有按星曜立论的条文）
+    for (const k of ['mingZhu', 'shenZhu', 'fiveElementsClass']) if (zw[k]) terms.add(zw[k]);
   }
   // 领域词单独返回：只作轻度加权，不能淹没盘面特征
   const domainTerms = new Set();
@@ -136,4 +171,6 @@ function retrieveBalanced(chart, domains, k = 10, opts = {}) {
   return [...bazi, ...ziwei];
 }
 
-module.exports = { retrieve, retrieveBalanced, loadKB };
+// 导出 extractQueryTerms 供回归脚本直连真实逻辑校验：
+// 复刻一份逻辑去测等于没测 —— 星曜词归零就是这么藏过去的。
+module.exports = { retrieve, retrieveBalanced, loadKB, extractQueryTerms };
