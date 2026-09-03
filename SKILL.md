@@ -32,6 +32,12 @@ preflight.js(澄清闸,拦截未确认项) → chart.js(双排盘,零幻觉) →
    拦截 4 项：城市未收录/未填、1986-05-04~1991-09-15 夏令时、23 时子时口径、农历闰月。
    `/api/interpret` 未确认则回 **422 + needConfirm**，不出报告（可传 `force:true` 绕过）。
    防死循环靠 `decided` 字段：用户答过的项不再追问（选「不校正」也是个决定）
+0a. **农历输入（2026-09-03）**：前端可切公历/农历，农历走 `src/lunar-convert.js` 在服务端
+   确定性转成公历 dateStr，之后全链路复用（闰月/夏令时/子时拦截自动生效）。
+   年历查询 `GET /api/lunar/year/:y`（闰月+每月天数，前端动态渲染下拉）。
+   **库的坑**：小月三十（如 2000 腊月三十）会静默进位到下月初一——必须 round-trip 校验
+   （转公历再转回农历逐项比对），不一致报「该农历日期不存在」；闰月不存在时库抛英文错，已转友好文案。
+   响应带 `lunarLabel`（如「农历1995年闰八月初三」）进结果卡、归档与导出。
 1. **chart.js**：lunar-javascript（八字）+ iztro（紫微）。真太阳时校正（城市经度表 259 座）+ 1986-91 夏令时扣回。时辰未知 → 时柱 null + `hourPillarMissing:true` + 紫微 `{skipped:true}`（B 级精度降级）
 2. **synthesize.js**：简化喜用神（扶抑法+月令加权）→ 五大领域信号提取 → S1-S3 合成（一致=高/单术=中/冲突=条件式/双中性=平稳）。规则文档：`docs/cross-validation-rules.md`
 3. **retrieve.js + data/kb.jsonl**：68 条知识（古籍公版原文为主）。改了 `knowledge/` 后运行 `node src/build-kb.js` 重建

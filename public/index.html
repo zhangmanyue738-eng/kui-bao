@@ -29,6 +29,16 @@
   .btn:hover { opacity: .92; }
   .btn:disabled { opacity: .5; cursor: wait; }
   .notice { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
+
+  /* ───── 农历/公历切换 ───── */
+  .cal-switch { display: flex; gap: 6px; margin-bottom: 8px; }
+  .cal-btn { padding: 5px 16px; border: 1px solid var(--line); border-radius: 999px; background: #fdfcfa;
+    font-size: 13px; cursor: pointer; font-family: inherit; color: var(--muted); }
+  .cal-btn.on { background: var(--accent-light); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .lunar-row { display: flex; gap: 6px; }
+  .lunar-row input { flex: 0 0 88px; }
+  .lunar-row select { flex: 1; min-width: 0; }
+  .lunar-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
   .chart-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
   .pillar { text-align: center; border: 1px solid var(--line); border-radius: 8px; padding: 10px 4px; background: #fdfcfa; }
   .pillar .t { font-size: 12px; color: var(--muted); }
@@ -133,8 +143,20 @@
   <div class="card" id="form-card">
     <div class="form-grid">
       <div class="field">
-        <label>出生日期（公历）</label>
+        <label>出生日期</label>
+        <div class="cal-switch" id="cal-switch">
+          <button type="button" class="cal-btn on" data-cal="solar" onclick="pickCalendar('solar')">公历</button>
+          <button type="button" class="cal-btn" data-cal="lunar" onclick="pickCalendar('lunar')">农历</button>
+        </div>
         <input type="date" id="date" required>
+        <div id="lunar-fields" style="display:none">
+          <div class="lunar-row">
+            <input type="number" id="lunar-year" min="1900" max="2100" step="1" placeholder="年" onchange="onLunarYearChange()" oninput="onLunarYearChange()">
+            <select id="lunar-month" onchange="onLunarMonthChange()"></select>
+            <select id="lunar-day"></select>
+          </div>
+          <p class="lunar-hint" id="lunar-hint">输入农历年（1900-2100）后选择月、日；闰月自动带出</p>
+        </div>
       </div>
       <div class="field">
         <label>出生时辰（不确定选「未知」）</label>
@@ -282,7 +304,7 @@ async function startRectify(payload) {
   result.innerHTML = '<div class="card status">正在生成定盘问题…</div>';
   const resp = await fetch('/api/rectify/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dateStr: payload.dateStr, gender: payload.gender, city: payload.city }),
+    body: JSON.stringify({ dateStr: payload.dateStr, gender: payload.gender, city: payload.city, lunar: payload.lunar }),
   });
   const data = await resp.json();
   if (data.error) { result.innerHTML = `<div class="card err">${esc(data.error)}</div>`; return; }
@@ -299,7 +321,7 @@ async function startRectify(payload) {
 async function startInterpret(hour) {
   const p = window._rectifyPayload;
   await runInterpret({
-    dateStr: p.dateStr, hour, gender: p.gender, city: p.city,
+    dateStr: p.dateStr, lunar: p.lunar, hour, gender: p.gender, city: p.city,
     domains: p.domains, rectified: hour != null,
   });
 }
@@ -338,14 +360,91 @@ async function sendFeedback(rating) {
   }
 }
 
+// ───────── 农历 / 公历切换 ─────────
+// 农历输入走服务端确定性转换（/api/interpret 传 lunar），转换后闰月/夏令时/子时澄清闸自动生效。
+// 年→月→日三级联动：选年后拉取该农历年的闰月与每月天数，不存在的日子（小月三十）直接不可选。
+let calendarType = 'solar';
+
+function pickCalendar(type) {
+  calendarType = type;
+  document.querySelectorAll('.cal-btn').forEach(b => b.classList.toggle('on', b.dataset.cal === type));
+  document.getElementById('date').style.display = type === 'solar' ? '' : 'none';
+  document.getElementById('lunar-fields').style.display = type === 'lunar' ? '' : 'none';
+  if (type === 'lunar' && !document.getElementById('lunar-month').options.length) {
+    const y = Number(document.getElementById('lunar-year').value) || 2000;
+    loadLunarYear(y);
+  }
+}
+
+async function loadLunarYear(year) {
+  const hint = document.getElementById('lunar-hint');
+  try {
+    const resp = await fetch('/api/lunar/year/' + year);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    const monthSel = document.getElementById('lunar-month');
+    const prev = monthSel.value;
+    monthSel.innerHTML = data.months.map(m =>
+      `<option value="${m.month}${m.leap ? 'L' : ''}">${m.leap ? '闰' : ''}${m.month}月（${m.days}天）</option>`).join('');
+    if (prev) monthSel.value = prev;
+    if (![...monthSel.options].some(o => o.value === monthSel.value)) monthSel.selectedIndex = 0;
+    hint.textContent = data.leapMonth
+      ? `${year} 年闰${data.leapMonth}月 · 日期以农历纪日为准，转换成公历后走同一套排盘`
+      : `${year} 年无闰月 · 日期以农历纪日为准，转换成公历后走同一套排盘`;
+    onLunarMonthChange();
+  } catch (e) {
+    hint.textContent = '年份超出支持范围（1900-2100）';
+  }
+}
+
+function onLunarYearChange() {
+  const y = Number(document.getElementById('lunar-year').value);
+  if (y >= 1900 && y <= 2100) loadLunarYear(y);
+}
+
+function onLunarMonthChange() {
+  const monthSel = document.getElementById('lunar-month');
+  const daySel = document.getElementById('lunar-day');
+  if (!monthSel.value) return;
+  const opt = monthSel.options[monthSel.selectedIndex];
+  const days = Number((opt.textContent.match(/（(\d+)天）/) || [])[1] || 30);
+  const prev = daySel.value;
+  daySel.innerHTML = Array.from({ length: days }, (_, i) => {
+    const n = i + 1;
+    const names = ['初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'];
+    return `<option value="${n}">${names[n-1]}</option>`;
+  }).join('');
+  if ([...daySel.options].some(o => o.value === prev)) daySel.value = prev;
+}
+
+/** 收集农历输入；无效返回 null 并在页面提示 */
+function collectLunar() {
+  const y = Number(document.getElementById('lunar-year').value);
+  const mv = document.getElementById('lunar-month').value;
+  const d = Number(document.getElementById('lunar-day').value);
+  if (!y || !mv || !d) {
+    document.getElementById('lunar-hint').textContent = '请先填齐农历年、月、日';
+    return null;
+  }
+  return { year: y, month: Number(String(mv).replace('L', '')), day: d, leap: String(mv).endsWith('L') };
+}
+
 document.getElementById('go').addEventListener('click', async () => {
-  const date = document.getElementById('date').value;
   const hourRaw = document.getElementById('hour').value;
   const gender = document.getElementById('gender').value;
   const city = document.getElementById('city').value.trim();
   const domains = [...document.querySelectorAll('.domains input:checked')].map(i => i.value);
-  if (!date) { document.getElementById('result').innerHTML = '<div class="card err">请先选择出生日期</div>'; return; }
-  const payload = { dateStr: date, gender, city, domains };
+
+  let payload;
+  if (calendarType === 'lunar') {
+    const lunar = collectLunar();
+    if (!lunar) return;
+    payload = { lunar, gender, city, domains };
+  } else {
+    const date = document.getElementById('date').value;
+    if (!date) { document.getElementById('result').innerHTML = '<div class="card err">请先选择出生日期</div>'; return; }
+    payload = { dateStr: date, gender, city, domains };
+  }
 
   // 时辰不确定 → 进入定盘问答流程
   if (hourRaw === 'rectify') { window._rectifyPayload = payload; return startRectify(payload); }
@@ -421,7 +520,7 @@ function skipClarify() {
   return runInterpret({ ...window._clarifyPayload, force: true });
 }
 
-async function runInterpret({ dateStr, hour, gender, city, domains, rectified, confirm, force }) {
+async function runInterpret({ dateStr, hour, gender, city, domains, rectified, confirm, force, lunar }) {
   const btn = document.getElementById('go');
   const result = document.getElementById('result');
   btn.disabled = true;
@@ -429,10 +528,10 @@ async function runInterpret({ dateStr, hour, gender, city, domains, rectified, c
   try {
     const resp = await fetch('/api/interpret', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dateStr, hour: hour ?? null, gender, city, domains, confirm, force })
+      body: JSON.stringify({ dateStr, hour: hour ?? null, gender, city, domains, confirm, force, lunar })
     });
     const data = await resp.json();
-    if (resp.status === 422 && data.needConfirm) { renderClarify({ dateStr, hour, gender, city, domains, rectified }, data); return; }
+    if (resp.status === 422 && data.needConfirm) { renderClarify({ dateStr, hour, gender, city, domains, rectified, lunar }, data); return; }
     if (data.error) throw new Error(data.error);
     if (data.complianceFailed) {
       result.innerHTML = `<div class="card err"><strong>本次解读未通过合规校验，已拦��不予输出。</strong><br>
@@ -444,6 +543,7 @@ async function runInterpret({ dateStr, hour, gender, city, domains, rectified, c
     result.innerHTML = renderResultBody(data, { sessionId: data.sessionId });
     window._lastSessionId = data.sessionId || null;
     window._lastPayload = { input: { dateStr, hour: hour ?? null, gender, city, domains, rectified: !!rectified,
+      lunar: lunar || data.lunarInput || null, lunarLabel: data.lunarLabel || null,
       sect: data.chart?.meta?.sect, sectStamp: data.sectStamp, trueSolar: data.chart?.meta?.trueSolar,
       warnings: data.preflightWarnings || [] }, report: data.report };
     // 归档成功后刷新抽屉角标，让人看得出「这次存进去了」
@@ -464,6 +564,7 @@ function renderResultBody(data, opts = {}) {
   {
     const p = data.chart.bazi.pillars;
     let html = `<div class="card"><h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:4px">八字四柱</h3>`;
+    if (data.lunarLabel) html += `<p style="font-size:12px;color:var(--accent)">农历输入：${esc(data.lunarLabel)} → 公历 ${esc(data.chart.meta.dateStr)}（确定性换算）</p>`;
     if (data.chart.meta.trueSolar) html += `<p style="font-size:12px;color:var(--muted)">真太阳时校正：${esc(data.chart.meta.trueSolar.note)}</p>`;
     if (data.sectStamp) html += `<p style="font-size:12px;color:var(--muted)">排盘口径：${esc(data.sectStamp)}</p>`;
     const pfw = data.preflightWarnings || [];
@@ -591,7 +692,8 @@ function renderHistList(data) {
   list.innerHTML = items.map(it => {
     const when = (it.ts || '').replace('T', ' ').slice(0, 16);
     const inp = it.input || {};
-    const who = [inp.dateStr, inp.hour != null ? inp.hour + ' 时' : '时辰未定', inp.gender, inp.city].filter(Boolean).join(' · ');
+    const who = [inp.dateStr, inp.hour != null ? inp.hour + ' 时' : '时辰未定', inp.gender, inp.city].filter(Boolean).join(' · ')
+      + (inp.lunarLabel ? ` <span class="badge facts">${esc(inp.lunarLabel)}</span>` : '');
     const idx = it.index || {};
     const mgStars = (idx.mingGongStars || []).join('、');
     const l2 = [idx.pillars, idx.dayMaster ? '日主 ' + idx.dayMaster : '', idx.mingZhu ? '命主 ' + idx.mingZhu : '',

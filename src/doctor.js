@@ -928,8 +928,69 @@ function render() {
   return { text: L.join('\n'), nFail, nWarn, nOk, nSkip };
 }
 
+// ---------- 农历输入转换（2026-09-03 新增农历支持） ----------
+function checkLunarConvert() {
+  let mod;
+  try {
+    mod = require(path.join(ROOT, 'src', 'lunar-convert.js'));
+  } catch (e) {
+    fail('农历转换', '模块可加载', `require 失败：${e.message}`, '检查 src/lunar-convert.js 语法');
+    return;
+  }
+
+  // ① 基准对照：农历2000年七月十六必须 = 公历 2000-08-15（次日 2000-08-16 是 README 基准盘）
+  try {
+    const r = mod.lunarToSolar({ year: 2000, month: 7, day: 16, leap: false });
+    if (r.dateStr !== '2000-8-15') {
+      fail('农历转换', '基准对照', `农历2000年七月十六 得 ${r.dateStr}，应为 2000-8-15`, '转换结果错误，检查 lunar-convert.js');
+      return;
+    }
+    ok('农历转换', '基准对照', '农历2000年七月十六 → 2000-8-15（次日为 README 基准盘）');
+  } catch (e) {
+    fail('农历转换', '基准对照', `意外报错：${e.message}`, '检查 lunar-convert.js');
+    return;
+  }
+
+  const problems = [];
+
+  // ② round-trip：闰月（1995 闰八月初三）必须转回去逐项一致
+  try {
+    const r = mod.lunarToSolar({ year: 1995, month: 8, day: 3, leap: true });
+    const { Solar } = require('lunar-javascript');
+    const [Y, M, D] = r.dateStr.split('-').map(Number);
+    const back = Solar.fromYmd(Y, M, D).getLunar();
+    if (back.getYear() !== 1995 || back.getMonth() !== -8 || back.getDay() !== 3) {
+      problems.push(`1995 闰八月初三 → ${r.dateStr} 回转得 ${back.getYear()}/${back.getMonth()}/${back.getDay()}`);
+    }
+  } catch (e) { problems.push(`1995 闰八月初三 转换失败：${e.message}`); }
+
+  // ③ 不存在的日期必须报错而不是静默进位：小月三十（2000 腊月只有廿九）
+  try {
+    const r = mod.lunarToSolar({ year: 2000, month: 12, day: 30, leap: false });
+    problems.push(`2000 腊月三十不存在却转换成功 → ${r.dateStr}（静默进位 = 日期错误）`);
+  } catch (e) { /* 正确报错 */ }
+
+  // ④ 闰月不存在必须报错：2000 年无闰月
+  try {
+    const r = mod.lunarToSolar({ year: 2000, month: 7, day: 5, leap: true });
+    problems.push(`2000 年无闰月却转换成功 → ${r.lunarLabel}`);
+  } catch (e) { /* 正确报错 */ }
+
+  problems.length
+    ? fail('农历转换', '边界行为', problems.join('；'), '不存在的农历日期必须报错，静默进位会算错整张盘')
+    : ok('农历转换', '边界行为', '闰月 round-trip 一致；小月三十/无闰月均正确报错');
+
+  // ⑤ 年历 API 数据源：闰月表抽检（1995 闰八月、2004 闰二月、2000 无闰月）
+  const cases = [[1995, 8], [2004, 2], [2000, 0], [2001, 4]];
+  const bad = cases.filter(([y, m]) => mod.getLeapMonth(y) !== m);
+  bad.length
+    ? fail('农历转换', '闰月表', bad.map(([y, m]) => `${y} 年应闰${m || '无'}月`).join('；'), 'LunarYear.getLeapMonth 行为异常')
+    : ok('农历转换', '闰月表', '抽检 1995/2004/2000/2001 均正确');
+}
+
 async function main() {
   checkRuntime();
+  checkLunarConvert();
   checkConfig();
   checkKnowledge();
   checkCities();

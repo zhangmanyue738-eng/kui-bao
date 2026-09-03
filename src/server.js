@@ -14,6 +14,21 @@ const { checkPreflight, applyConfirmations } = require('./preflight.js');
 const sessions = require('./sessions.js');
 const { buildDocx, suggestName } = require('./report.js');
 const { buildAttribution } = require('./badcase.js');
+const lunarConvert = require('./lunar-convert.js');
+
+/**
+ * 农历输入统一入口：传了 lunar（{year,month,day,leap}）就在服务端确定性转成公历 dateStr，
+ * 之后走原有全链路——闰月/夏令时/子时三道澄清闸基于转换后的公历自动生效，零改动复用。
+ * 返回 { dateStr, lunarLabel, lunarInput }；没传 lunar 返回 { dateStr: 原值 }。
+ */
+function resolveDateInput({ dateStr, lunar }) {
+  if (lunar && lunar.year) {
+    if (dateStr) throw new Error('公历与农历只能二选一，请勿同时提交');
+    const r = lunarConvert.lunarToSolar(lunar);
+    return { dateStr: r.dateStr, lunarLabel: r.lunarLabel, lunarInput: r.lunar };
+  }
+  return { dateStr };
+}
 
 // 定盘会话（内存态，自用规模足够；重启即失效）
 const rectifySessions = new Map();
@@ -74,6 +89,22 @@ async function route(req, res) {
     return json(res, 200, { count: cities.length, cities });
   }
 
+  // ── 农历年历：某农历年闰几月 + 每月天数，供前端动态渲染月/日下拉
+  if (req.method === 'GET' && /^\/api\/lunar\/year\/\d+$/.test(req.url)) {
+    try {
+      const year = Number(req.url.split('/').pop());
+      const leapMonth = lunarConvert.getLeapMonth(year);
+      const months = [];
+      for (let m = 1; m <= 12; m++) {
+        months.push({ month: m, leap: false, days: lunarConvert.getMonthDays(year, m) });
+        if (leapMonth === m) months.push({ month: m, leap: true, days: lunarConvert.getMonthDays(year, -m) });
+      }
+      return json(res, 200, { year, leapMonth, months });
+    } catch (e) {
+      return json(res, 400, { error: e.message });
+    }
+  }
+
   if (req.method === 'POST' && req.url === '/api/feedback') {
     let body = '';
     req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
@@ -128,10 +159,11 @@ async function route(req, res) {
     req.on('data', c => { body += c; });
     req.on('end', () => {
       try {
-        const { dateStr, gender, city, knownHour, mode } = JSON.parse(body);
-        if (!dateStr) throw new Error('缺少出生日期');
+        const { dateStr, gender, city, knownHour, mode, lunar } = JSON.parse(body);
+        const resolved = resolveDateInput({ dateStr, lunar });
+        if (!resolved.dateStr) throw new Error('缺少出生日期');
         const session = rect.createSession({
-          dateStr, gender: gender === '女' ? '女' : '男', city,
+          dateStr: resolved.dateStr, gender: gender === '女' ? '女' : '男', city,
           knownHour: knownHour ?? null, mode: mode || (knownHour != null ? 'refine' : 'full'),
         });
         const id = 'R' + Date.now() + Math.random().toString(36).slice(2, 6);
@@ -262,17 +294,20 @@ async function route(req, res) {
     req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
     req.on('end', async () => {
       try {
-        const { dateStr, hour, gender, city, domains, confirm, force, rectified } = JSON.parse(body);
+        const { dateStr: rawDateStr, hour, gender, city, domains, confirm, force, rectified, lunar } = JSON.parse(body);
+        const { dateStr, lunarLabel, lunarInput } = resolveDateInput({ dateStr: rawDateStr, lunar });
         const inputRectified = rectified;
         if (!dateStr) throw new Error('缺少出生日期');
 
         // 澄清闸：合并用户确认 → 体检 → 仍有未确认的阻断项则 422，不出报告
+        // （农历输入已在 resolveDateInput 转成公历，闰月/夏令时/子时拦截自动生效）
         const merged = applyConfirmations({ dateStr, hour, gender, city }, confirm);
         const pre = checkPreflight(merged);
         if (!pre.ok && !force) {
           res.writeHead(422, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({
             needConfirm: true,
+            lunarLabel,
             message: '有几项会影响排盘结果的设置需要你确认后才能出报告。',
             blocking: pre.blocking, warnings: pre.warnings, facts: pre.facts,
           }));
@@ -293,7 +328,8 @@ async function route(req, res) {
           try {
             sessionId = sessions.saveSession({
               input: { dateStr, hour: hour ?? null, gender: gender === '女' ? '女' : '男',
-                city: merged.city, domains: domainList, rectified: !!inputRectified },
+                city: merged.city, domains: domainList, rectified: !!inputRectified,
+                lunarInput, lunarLabel },
               chart, synthesis, report: r.report,
               model: r.model, usage: r.usage, rag: r.rag, degraded: r.degraded,
               passages: r.passages, preflightWarnings: pre.warnings,
@@ -305,7 +341,8 @@ async function route(req, res) {
         }
 
         return json(res, 200, { ...r, chart, synthesis, sessionId,
-          sectStamp: chart.meta.sectStamp, preflightWarnings: pre.warnings });
+          sectStamp: chart.meta.sectStamp, preflightWarnings: pre.warnings,
+          lunarLabel, lunarInput });
       } catch (e) {
         return json(res, 500, { error: e.message });
       }
