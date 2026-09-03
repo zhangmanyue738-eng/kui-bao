@@ -13,6 +13,7 @@ const rect = require('./rectify.js');
 const { checkPreflight, applyConfirmations } = require('./preflight.js');
 const sessions = require('./sessions.js');
 const { buildDocx, suggestName } = require('./report.js');
+const { buildAttribution } = require('./badcase.js');
 
 // 定盘会话（内存态，自用规模足够；重启即失效）
 const rectifySessions = new Map();
@@ -80,12 +81,26 @@ async function route(req, res) {
       try {
         const { input, report, rating, comment, facts, sessionId } = JSON.parse(body);
         if (!['good', 'bad'].includes(rating)) throw new Error('rating 必须是 good 或 bad');
+
+        // 归因快照：把「这条评价是在什么盘、什么判定下产生的」当场固化下来。
+        // 踩过的坑：feedback 原本只存 sessionId 一个指针，而归档是**可删除**的
+        // （前端有「删除档案」按钮）——实测 3/3 条反馈指向的归档已不存在，
+        // 拿不到日主/命宫/判定/引用条文，这条 badcase 就彻底无法归因了。
+        // 只存生辰也不行：口径可能已经变了，重排出来的盘跟当时不是一回事。
+        // 多花几百字节换「归档没了也能归因」，对攒 badcase 这个目的完全值得。
+        let attribution = null;
+        if (sessionId) {
+          const s = sessions.getSession(sessionId);
+          if (s) attribution = buildAttribution(s);
+        }
+
         // facts：用户补充的真实人生事实（哪年发生了什么），是后续校正取证规则的关键数据
         const record = {
           ts: new Date().toISOString(), input, rating, sessionId: sessionId || null,
           comment: (comment || '').slice(0, 2000),
           facts: (facts || '').slice(0, 2000),
           report: (report || '').slice(0, 20000),
+          attribution,
         };
         // feedback.jsonl 是不可变审计流水（只追加、永不改写）；
         // 同时把结构化结论回写到会话档案，便于按评分/事实检索——两套数据各有用途。

@@ -19,7 +19,9 @@
     "rq": "node tools/retrieval-quality.js",
     "rq:base": "LEGACY=1 node tools/retrieval-quality.js",
     "reportcheck": "node tools/report-check.js",
-    "test": "npm run schema && npm run bench -- --verify && npm run reportcheck && npm run verify && npm run crosscheck",
+    "badcase": "node src/badcase.js",
+    "badcase:check": "node tools/badcase-selftest.js",
+    "test": "npm run schema && npm run bench -- --verify && npm run reportcheck && npm run badcase:check && npm run verify && npm run crosscheck",
     "test:full": "npm test && npm run stability",
     "sessions": "node src/sessions.js",
     "doctor": "node src/doctor.js"

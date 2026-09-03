@@ -701,6 +701,97 @@ function checkExport() {
     : fail('报告导出', '导出路由', "src/server.js 里找不到 /api/report/export", '前端按钮会 404');
 }
 
+/**
+ * badcase 归因链路。
+ * 这一组防的是「静默失效」——攒反馈是几周的事，等发现链路断了，数据早就白攒了。
+ * 其中「快照接线」那条是踩过的坑：加了 buildAttribution(s) 调用却忘了 require，
+ * 服务照常启动，等第一次提交反馈时才抛 buildAttribution is not defined。
+ */
+function checkBadcase() {
+  let badcase;
+  try {
+    badcase = require(path.join(ROOT, 'src', 'badcase.js'));
+  } catch (e) {
+    fail('badcase', '模块可加载', `require 失败：${e.message}`, '检查 src/badcase.js 语法');
+    return;
+  }
+  const need = ['analyze', 'buildAttribution', 'featureKeys', 'wilson', 'report'];
+  const miss = need.filter(k => typeof badcase[k] !== 'function');
+  miss.length
+    ? fail('badcase', '导出接口', `缺失：${miss.join('、')}`)
+    : ok('badcase', '导出接口', need.join(' / ') + ' 就位');
+
+  // ① 统计口径：小样本下区间必须够宽，否则工具会给出「看起来很确定」的错误结论
+  try {
+    const w01 = badcase.wilson(0, 1);
+    const w11 = badcase.wilson(1, 1);
+    if (!(w01.hi > 0.5)) fail('badcase', 'Wilson 区间', `0/1 的上界只有 ${w01.hi.toFixed(3)}，会把「没数据」当成「没问题」`);
+    else if (!(w11.lo < 0.3)) fail('badcase', 'Wilson 区间', `1/1 的下界高达 ${w11.lo.toFixed(3)}，会把「一次不准」当成「100% 不准」`);
+    else ok('badcase', 'Wilson 区间', `0/1→[0,${w01.hi.toFixed(2)}] 1/1→[${w11.lo.toFixed(2)},1]，小样本未被当成确定结论`);
+  } catch (e) {
+    fail('badcase', 'Wilson 区间', `计算抛错：${e.message}`, '小样本下正态近似会越界，必须用 Wilson');
+  }
+
+  // ② 归因快照接线：server 必须既 require 又调用，缺任一都是静默失效
+  let server = '';
+  try { server = fs.readFileSync(path.join(ROOT, 'src', 'server.js'), 'utf8'); } catch { /* 下面判失败 */ }
+  const hasRequire = /require\(['"]\.\/badcase\.js['"]\)/.test(server);
+  const hasCall = /buildAttribution\(/.test(server);
+  if (!hasRequire && !hasCall) {
+    fail('badcase', '快照接线', 'server.js 既没引入也没调用 buildAttribution', '新反馈会没有 attribution，攒再多也无法归因');
+  } else if (!hasRequire) {
+    fail('badcase', '快照接线', 'server.js 调用了 buildAttribution 但没有 require', '第一次提交反馈就会抛 buildAttribution is not defined');
+  } else if (!hasCall) {
+    fail('badcase', '快照接线', 'server.js 引入了 buildAttribution 但没在 /api/feedback 里调用', '归档一删，这批反馈就永久无法归因了');
+  } else {
+    ok('badcase', '快照接线', 'require + /api/feedback 调用均就位');
+  }
+
+  // ③ 字段映射：sessions.index 的结构一变，buildAttribution 就会静默抽出一片 null。
+  //    用真实归档验一次，比任何单元测试都直接。
+  const sessionsFile = path.join(ROOT, 'data', 'sessions.jsonl');
+  let checked = null;
+  try {
+    for (const line of fs.readFileSync(sessionsFile, 'utf8').split('\n')) {
+      if (!line.trim()) continue;
+      checked = badcase.buildAttribution(JSON.parse(line));
+      break;
+    }
+  } catch { /* 归档为空或不可读 */ }
+
+  if (!checked) {
+    // 没有归档可验，不算失败——但也不该假装通过
+    ok('badcase', '字段映射', '无归档可校验（跳过）');
+  } else {
+    const hasChartFields = checked.dayMaster && Array.isArray(checked.domains);
+    const hasDomainShape = checked.domains.some(d => d.domain && d.verdict);
+    if (!hasChartFields || !hasDomainShape) {
+      fail('badcase', '字段映射', `抽出的快照不完整：dayMaster=${checked.dayMaster} domains=${JSON.stringify(checked.domains).slice(0, 80)}`,
+        'sessions.js 的 index 结构改过？buildAttribution 的字段名要跟着改，否则归因全是 null');
+    } else {
+      ok('badcase', '字段映射', `日主=${checked.dayMaster} 命主=${checked.mingZhu || '—'} 领域 ${checked.domains.length} 项，真实归档可归因`);
+    }
+  }
+
+  // ④ 数据健康度：孤儿太多说明快照没生效。这是数据问题，warn 不是 fail
+  try {
+    const r = badcase.analyze({});
+    if (!r.rated) {
+      ok('badcase', '数据健康度', '尚无评分反馈（工具待投喂）');
+    } else if (r.rated && r.orphans === r.rated) {
+      warn('badcase', '数据健康度', `${r.rated} 条反馈全部缺归因快照`,
+        '新反馈应自带快照；历史孤儿无法回填，继续用会自然替换');
+    } else if (r.orphans) {
+      warn('badcase', '数据健康度', `${r.orphans}/${r.rated} 条缺归因快照（${r.withAttribution} 条可归因）`,
+        '判定基线只用可归因部分，孤儿不会污染判定');
+    } else {
+      ok('badcase', '数据健康度', `${r.rated} 条反馈全部带快照，基线 ${(r.baseline.p * 100).toFixed(1)}%`);
+    }
+  } catch (e) {
+    fail('badcase', '数据健康度', `analyze 抛错：${e.message}`);
+  }
+}
+
 // =====================================================================
 // 输出
 // =====================================================================
@@ -756,6 +847,7 @@ async function main() {
   checkSessions();
   checkBench();
   checkExport();
+  checkBadcase();
   await checkLLM();
   await checkService();
 
