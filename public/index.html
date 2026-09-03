@@ -371,8 +371,10 @@ function pickCalendar(type) {
   document.getElementById('date').style.display = type === 'solar' ? '' : 'none';
   document.getElementById('lunar-fields').style.display = type === 'lunar' ? '' : 'none';
   if (type === 'lunar' && !document.getElementById('lunar-month').options.length) {
-    const y = Number(document.getElementById('lunar-year').value) || 2000;
-    loadLunarYear(y);
+    // 切到农历时预填当前农历年（近似公历年，用户可改），别让用户面对三个空框
+    const yearInput = document.getElementById('lunar-year');
+    if (!yearInput.value) yearInput.value = new Date().getFullYear();
+    loadLunarYear(Number(yearInput.value));
   }
 }
 
