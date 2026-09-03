@@ -1,8 +1,6 @@
 # 命理顾问（八字 + 紫微斗数「双术互证」）
 
-> 接手自 2026-08-28 交接。完整交接提示词见：
-> `/Users/yanqiu/WorkBuddy/2026-08-25-16-34-33/.workbuddy/artifacts/handoff-prompt-bazi-ziwei-consultant.md`
-> 调研报告：同目录下 `bazi-ziwei-consultant-2026-08-28.md`、`dual-method-consultant-design-2026-08-28.md`
+> 接手自 2026-08-28 交接（交接提示词与调研报告原存于 WorkBuddy 会话工作区，已随会话归档，不再提供本地路径）。
 
 ## 项目目标
 
