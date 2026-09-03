@@ -16,6 +16,7 @@
     "stability": "node src/stability.js 3",
     "test": "npm run schema && npm run verify && npm run crosscheck",
     "test:full": "npm test && npm run stability",
+    "sessions": "node src/sessions.js",
     "doctor": "node src/doctor.js"
   },
   "keywords": [],

@@ -51,6 +51,55 @@
   .status { text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px; letter-spacing: 2px; }
   .err { color: #b03a2e; background: #fdeeec; border: 1px solid #f0c4bd; border-radius: 8px; padding: 12px 16px; font-size: 14px; }
   .disclaimer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; border-top: 1px solid var(--line); padding-top: 20px; letter-spacing: 1px; }
+
+  /* ───── 历史档案面板 ───── */
+  .hist-toggle { position: fixed; top: 20px; right: 20px; padding: 9px 18px; background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 999px; font-size: 13px; cursor: pointer; font-family: inherit;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06); z-index: 40; }
+  .hist-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .hist-toggle .n { color: var(--accent); font-weight: 600; }
+  .drawer-mask { position: fixed; inset: 0; background: rgba(43,38,32,.28); z-index: 50; display: none; }
+  .drawer-mask.on { display: block; }
+  .drawer { position: fixed; top: 0; right: 0; height: 100%; width: 480px; max-width: 92vw; background: var(--bg);
+    z-index: 60; transform: translateX(100%); transition: transform .22s ease; display: flex; flex-direction: column;
+    box-shadow: -4px 0 20px rgba(0,0,0,.12); }
+  .drawer.on { transform: translateX(0); }
+  .drawer-head { padding: 20px 22px 14px; border-bottom: 1px solid var(--line); background: var(--card); }
+  .drawer-head h2 { font-size: 17px; letter-spacing: 3px; margin-bottom: 4px; }
+  .drawer-head .sub { font-size: 12px; color: var(--muted); }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 16px 22px 30px; }
+  .hist-search { display: flex; gap: 8px; margin-bottom: 12px; }
+  .hist-search input { flex: 1; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: 14px; background: #fdfcfa; font-family: inherit; }
+  .hist-search input:focus { outline: none; border-color: var(--accent); }
+  .hist-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chip { padding: 5px 13px; border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+    font-size: 12px; cursor: pointer; font-family: inherit; color: var(--muted); }
+  .chip.on { background: var(--accent-light); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .hist-item { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+    margin-bottom: 10px; cursor: pointer; }
+  .hist-item:hover { border-color: var(--accent); }
+  .hist-item .l1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .hist-item .who { font-size: 14px; font-weight: 600; }
+  .hist-item .when { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .hist-item .l2 { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
+  .hist-item .note { font-size: 12px; color: var(--accent); margin-top: 4px; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; margin-left: 6px; }
+  .badge.good { background: #eef4ea; color: #4a6b3a; border: 1px solid #b7cfab; }
+  .badge.bad  { background: #fdeeec; color: #b03a2e; border: 1px solid #f0c4bd; }
+  .badge.none { background: #f5f3ef; color: var(--muted); border: 1px solid var(--line); }
+  .hist-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 50px 0; line-height: 2; }
+  .badge.facts { background: #fdf6e8; color: #8a6d2f; border: 1px solid #ecdcb8; }
+  .hist-actions { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); align-items: center; }
+  .hist-actions .spacer { flex: 1; }
+  .mini-btn { padding: 6px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fdfcfa;
+    font-size: 13px; cursor: pointer; font-family: inherit; }
+  .mini-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .mini-btn.danger:hover { border-color: #b03a2e; color: #b03a2e; }
+  .note-input { width: 100%; margin-top: 8px; padding: 8px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 13px; background: #fdfcfa; font-family: inherit; }
+  .note-input:focus { outline: none; border-color: var(--accent); }
+@media (max-width: 640px) { .hist-toggle { top: 12px; right: 12px; padding: 7px 14px; font-size: 12px; } }
 </style>
 </head>
 <body>
@@ -108,6 +157,28 @@
 
   <p class="disclaimer">本工具输出为传统文化 / 娱乐参考，不构成医疗、投资、婚姻等重大决策建议。</p>
 </div>
+
+<button class="hist-toggle" id="hist-toggle" onclick="toggleHistory()">历史档案 <span class="n" id="hist-count">0</span></button>
+<div class="drawer-mask" id="hist-mask" onclick="toggleHistory(false)"></div>
+<aside class="drawer" id="hist-drawer" aria-label="历史档案">
+  <div class="drawer-head">
+    <h2>历史档案</h2>
+    <p class="sub" id="hist-sub">每次解读自动归档 · 可按姓名、城市、四柱、报告正文全文检索</p>
+  </div>
+  <div class="drawer-body">
+    <div class="hist-search">
+      <input type="text" id="hist-q" placeholder="搜索：备注 / 城市 / 日主 / 命宫主星 / 报告正文" onkeydown="if(event.key==='Enter')loadHistory()">
+      <button class="mini-btn" onclick="loadHistory()">搜索</button>
+    </div>
+    <div class="hist-filters" id="hist-filters">
+      <button class="chip on" data-rating="" onclick="pickRating('')">全部</button>
+      <button class="chip" data-rating="good" onclick="pickRating('good')">有帮助</button>
+      <button class="chip" data-rating="bad" onclick="pickRating('bad')">不准</button>
+      <button class="chip" data-rating="unrated" onclick="pickRating('unrated')">待评价</button>
+    </div>
+    <div id="hist-list"><div class="hist-empty">加载中…</div></div>
+  </div>
+</aside>
 
 <script>
 // 城市清单的唯一真相在后端 CITY_LONGITUDE（GET /api/cities）。
@@ -231,12 +302,18 @@ async function sendFeedback(rating) {
   const area = document.getElementById('fb-area');
   const factsEl = document.getElementById('fb-facts');
   const facts = factsEl ? factsEl.value.trim() : '';
+  const sessionId = window._lastSessionId || null;
   try {
-    await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...window._lastPayload, rating, facts }) });
-    area.innerHTML = '<span style="font-size:13px;color:var(--accent)">已记录，感谢反馈（用于校正解读规则）</span>';
+    const resp = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...window._lastPayload, sessionId, rating, facts }) });
+    const d = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(d.error || ('HTTP ' + resp.status));
+    // feedback.jsonl 是不可变审计流水；同时后端会把结构化结论回写进档案，便于日后按「不准」检索
+    area.innerHTML = '<span style="font-size:13px;color:var(--accent)">已记录，感谢反馈（用于校正解读规则）'
+      + (d.linked ? ' · 已关联到本次档案' : '') + '</span>';
+    if (sessionId) refreshHistCount();
   } catch (e) {
-    area.innerHTML = '<span style="font-size:13px;color:#b03a2e">反馈失败</span>';
+    area.innerHTML = `<span style="font-size:13px;color:#b03a2e">反馈失败：${esc(e.message)}</span>`;
   }
 }
 
@@ -343,7 +420,27 @@ async function runInterpret({ dateStr, hour, gender, city, domains, rectified, c
       btn.disabled = false;
       return;
     }
-    // 排盘摘要
+    result.innerHTML = renderResultBody(data, { sessionId: data.sessionId });
+    window._lastSessionId = data.sessionId || null;
+    window._lastPayload = { input: { dateStr, hour: hour ?? null, gender, city, domains, rectified: !!rectified,
+      sect: data.chart?.meta?.sect, sectStamp: data.sectStamp, trueSolar: data.chart?.meta?.trueSolar,
+      warnings: data.preflightWarnings || [] }, report: data.report };
+    // 归档成功后刷新抽屉角标，让人看得出「这次存进去了」
+    if (data.sessionId) refreshHistCount();
+  } catch (e) {
+    result.innerHTML = `<div class="card err">出错了：${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/**
+ * 渲染一次解读的完整结果（排盘 + 互证合成 + 报告 + 反馈区）。
+ * 新解读与历史档案共用同一条渲染路径 —— 复制两份必然日后改一处漏一处。
+ * data 形如 /api/interpret 的响应，或会话档案里的 chart/synthesis/report 字段。
+ */
+function renderResultBody(data, opts = {}) {
+  {
     const p = data.chart.bazi.pillars;
     let html = `<div class="card"><h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:4px">八字四柱</h3>`;
     if (data.chart.meta.trueSolar) html += `<p style="font-size:12px;color:var(--muted)">真太阳时校正：${esc(data.chart.meta.trueSolar.note)}</p>`;
@@ -384,26 +481,194 @@ async function runInterpret({ dateStr, hour, gender, city, domains, rectified, c
       html += `</div><p style="font-size:12px;color:var(--muted);margin-top:6px">双术一致 → 置信度高；单术有信号 → 中；双术冲突 → 条件式结论（正文中以「若…则…」呈现）</p>`;
     }
     const stamp = data.sectStamp ? `<p style="margin-top:20px;padding-top:12px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);letter-spacing:1px">本盘口径：${esc(data.sectStamp)}</p>` : '';
-    html += `</div><div class="card report"><h2 style="letter-spacing:4px;color:var(--accent)">解读报告</h2><p style="font-size:12px;color:var(--muted);margin-bottom:8px">模型：${esc(data.model)} · tokens：${data.usage?.total_tokens ?? '-'} · 知识库条文：${(data.passages && data.passages.length) ? data.passages.length + ' 条' : '未启用'}</p><div class="report-body">${mdLite(data.report)}</div>${stamp}
+    const archived = opts.sessionId
+      ? `<p style="font-size:12px;color:var(--muted);margin-top:10px">评价与补充会写回档案 <code>${esc(opts.sessionId)}</code>，日后可按「不准」检索复盘。</p>`
+      : '';
+    html += `</div><div class="card report"><h2 style="letter-spacing:4px;color:var(--accent)">解读报告</h2><p style="font-size:12px;color:var(--muted);margin-bottom:8px">模型：${esc(data.model || '-')} · tokens：${data.usage?.total_tokens ?? '-'} · 知识库条文：${(data.passages && data.passages.length) ? data.passages.length + ' 条' : '未启用'}</p><div class="report-body">${mdLite(data.report)}</div>${stamp}
       <div style="margin-top:24px;border-top:1px dashed var(--line);padding-top:16px;text-align:center" id="fb-area">
         <span style="font-size:13px;color:var(--muted);margin-right:10px">这份解读对你有参考价值吗？</span>
         <button class="fb-btn" onclick="sendFeedback('good')">有帮助</button>
         <button class="fb-btn" onclick="sendFeedback('bad')">不准/没帮助</button>
         <div style="margin-top:12px">
-          <input id="fb-facts" type="text" placeholder="可选：补充真实情况（如「2020年确实换了行业」），用于校正解读规则"
+          <input id="fb-facts" type="text" value="${esc(opts.facts || '')}" placeholder="可选：补充真实情况（如「2020年确实换了行业」），用于校正解读规则"
                  style="width:100%;max-width:520px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fdfcfa;font-family:inherit">
-        </div>
+        </div>${archived}
       </div></div>`;
-    result.innerHTML = html;
-    window._lastPayload = { input: { dateStr, hour: hour ?? null, gender, city, domains, rectified: !!rectified,
-      sect: data.chart?.meta?.sect, sectStamp: data.sectStamp, trueSolar: data.chart?.meta?.trueSolar,
-      warnings: pfw }, report: data.report };
-  } catch (e) {
-    result.innerHTML = `<div class="card err">出错了：${esc(e.message)}</div>`;
-  } finally {
-    btn.disabled = false;
+    return html;
   }
 }
+
+// ───────────────── 历史档案抽屉 ─────────────────
+// 每次解读自动归档到 data/sessions.jsonl（后端 /api/sessions）。
+// 攒 badcase 的价值全在「能不能翻出来」——所以这里把检索、备注、评价、补事实都做进界面。
+let histRating = '';
+
+function toggleHistory(on) {
+  const drawer = document.getElementById('hist-drawer');
+  const mask = document.getElementById('hist-mask');
+  const next = on === undefined ? !drawer.classList.contains('on') : !!on;
+  drawer.classList.toggle('on', next);
+  mask.classList.toggle('on', next);
+  if (next) { loadHistory(); refreshHistCount(); }
+}
+
+function pickRating(r) {
+  histRating = r;
+  document.querySelectorAll('#hist-filters .chip').forEach(c => c.classList.toggle('on', c.dataset.rating === r));
+  loadHistory();
+}
+
+async function refreshHistCount() {
+  try {
+    const resp = await fetch('/api/sessions?action=stats');
+    if (!resp.ok) return;
+    const s = await resp.json();
+    document.getElementById('hist-count').textContent = s.total ?? 0;
+    const g = s.byRating?.good || 0, b = s.byRating?.bad || 0;
+    document.getElementById('hist-sub').textContent =
+      `共 ${s.total} 条 · 已评价 ${g + b}（准 ${g} / 不准 ${b}）· 带回真实事实 ${s.withFacts || 0} 条`
+      + (s.badLines ? ` · 坏行 ${s.badLines} 条（需修）` : '');
+  } catch (e) { /* 服务没启动时静默，按钮角标保持 0 */ }
+}
+
+async function loadHistory() {
+  const list = document.getElementById('hist-list');
+  const q = (document.getElementById('hist-q').value || '').trim();
+  const params = new URLSearchParams({ limit: '50' });
+  if (q) params.set('q', q);
+  if (histRating) params.set('rating', histRating);
+  try {
+    const resp = await fetch('/api/sessions?' + params.toString());
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    renderHistList(data);
+  } catch (e) {
+    list.innerHTML = `<div class="hist-empty">读取失败：${esc(e.message)}<br>服务没启动时就会这样</div>`;
+  }
+}
+
+function renderHistList(data) {
+  const list = document.getElementById('hist-list');
+  const items = data.items || [];
+  if (!items.length) {
+    const filtered = histRating || (document.getElementById('hist-q').value || '').trim();
+    list.innerHTML = `<div class="hist-empty">${filtered ? '没有符合条件的档案' : '还没有归档记录。<br>跑一次解读就会自动存进来。'}</div>`;
+    return;
+  }
+  const RB = { good: '<span class="badge good">有帮助</span>', bad: '<span class="badge bad">不准</span>' };
+  list.innerHTML = items.map(it => {
+    const when = (it.ts || '').replace('T', ' ').slice(0, 16);
+    const inp = it.input || {};
+    const who = [inp.dateStr, inp.hour != null ? inp.hour + ' 时' : '时辰未定', inp.gender, inp.city].filter(Boolean).join(' · ');
+    const idx = it.index || {};
+    const l2 = [idx.pillars, idx.dayMaster ? '日主 ' + idx.dayMaster : '', idx.mingStar ? '命宫 ' + idx.mingStar : '',
+      idx.ziweiSkipped ? '紫微未排' : ''].filter(Boolean).join(' · ');
+    return `<div class="hist-item" onclick="openSession('${esc(it.id)}')">
+      <div class="l1"><span class="who">${esc(who || '未命名')}</span><span class="when">${esc(when)}</span></div>
+      <div class="l2">${esc(l2)}</div>
+      ${it.note ? `<div class="note">备注：${esc(it.note)}</div>` : ''}
+      ${it.facts ? `<div class="note">真实情况：${esc(it.facts)}</div>` : ''}
+      <div class="hist-actions" onclick="event.stopPropagation()">
+        ${RB[it.rating] || '<span class="badge none">待评价</span>'}
+        <span class="spacer"></span>
+        <button class="mini-btn" onclick="openSession('${esc(it.id)}')">打开</button>
+        <button class="mini-btn danger" onclick="deleteSession('${esc(it.id)}')">删除</button>
+      </div></div>`;
+  }).join('') + ((data.total > items.length)
+    ? `<p style="text-align:center;color:var(--muted);font-size:12px;margin-top:12px">仅显示最近 ${items.length} 条，共 ${data.total} 条 —— 用搜索缩小范围</p>` : '');
+}
+
+/** 打开一份档案：完整排盘 + 报告 + 备注/评价/补事实。quiet=true 时不跳回顶部（用于原地刷新） */
+async function openSession(id, quiet) {
+  const result = document.getElementById('result');
+  const y = window.scrollY;
+  if (!quiet) {
+    result.innerHTML = '<div class="card status">读取档案…</div>';
+    toggleHistory(false);
+  }
+  try {
+    const resp = await fetch('/api/sessions/' + encodeURIComponent(id));
+    const s = await resp.json();
+    if (!resp.ok) throw new Error(s.error || ('HTTP ' + resp.status));
+    window._lastSessionId = s.id;
+    window._lastPayload = { input: s.input, report: s.report };
+    const RB = { good: '<span class="badge good">已标：有帮助</span>', bad: '<span class="badge bad">已标：不准</span>' };
+    const bar = `<div class="card">
+      <h3 style="color:var(--accent);letter-spacing:4px;margin-bottom:6px">历史档案</h3>
+      <p style="font-size:12px;color:var(--muted)">档案号 ${esc(s.id)} · 归档于 ${esc((s.ts || '').replace('T', ' ').slice(0, 19))}${s.meta && s.meta.model ? ' · 模型 ' + esc(s.meta.model) : ''}</p>
+      <div style="margin-top:12px">${RB[s.rating] || '<span class="badge none">尚未评价</span>'}</div>
+      <textarea id="sess-note" class="note-input" rows="2" placeholder="备注：是谁的盘、当时想看什么、后来验证了什么">${esc(s.note || '')}</textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="mini-btn" onclick="saveNote('${esc(s.id)}')">保存备注</button>
+        <button class="mini-btn" onclick="rateSession('${esc(s.id)}','good')">有帮助</button>
+        <button class="mini-btn" onclick="rateSession('${esc(s.id)}','bad')">不准</button>
+        <button class="mini-btn" onclick="rateSession('${esc(s.id)}','')">清除评价</button>
+        <span class="spacer" style="flex:1"></span>
+        <button class="mini-btn danger" onclick="deleteSession('${esc(s.id)}')">删除档案</button>
+      </div></div>`;
+    result.innerHTML = bar + renderResultBody({
+      chart: s.chart, synthesis: s.synthesis, report: s.report,
+      model: s.meta && s.meta.model, usage: s.meta && s.meta.usage,
+      passages: s.meta && s.meta.passages, sectStamp: s.sectStamp,
+      preflightWarnings: s.preflightWarnings,
+      degraded: s.meta && s.meta.degraded,
+    }, { sessionId: s.id, facts: s.facts });
+    result.dataset.showing = s.id;   // 让「删除档案」知道当前页面展示的就是这份，可以清空
+    if (quiet) window.scrollTo(0, y); else window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    result.innerHTML = `<div class="card err">读取失败：${esc(e.message)}</div>`;
+  }
+}
+
+async function patchSession(id, patch, { reload = false } = {}) {
+  try {
+    const resp = await fetch('/api/sessions/' + encodeURIComponent(id), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || ('HTTP ' + resp.status));
+    toast('已保存');
+    refreshHistCount();
+    if (reload) openSession(id, true);
+  } catch (e) {
+    toast('保存失败：' + e.message);
+  }
+}
+
+function saveNote(id) {
+  const el = document.getElementById('sess-note');
+  return patchSession(id, { note: el ? el.value : '' });
+}
+
+function rateSession(id, rating) {
+  return patchSession(id, { rating: rating || null }, { reload: true });
+}
+
+async function deleteSession(id) {
+  if (!confirm('删除这份档案？报告正文与备注一并删除，不可恢复。')) return;
+  try {
+    const resp = await fetch('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || ('HTTP ' + resp.status));
+    toast('已删除');
+    if (window._lastSessionId === id) { window._lastSessionId = null; }
+    loadHistory(); refreshHistCount();
+    const result = document.getElementById('result');
+    if (result.dataset.showing === id) result.innerHTML = '<div class="card status">档案已删除</div>';
+  } catch (e) { toast('删除失败：' + e.message); }
+}
+
+function toast(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:#2b2620;color:#fdfcfa;' +
+    'padding:9px 20px;border-radius:999px;font-size:13px;z-index:99;box-shadow:0 4px 14px rgba(0,0,0,.18)';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1800);
+}
+
+// 页面加载时先把角标取回来，别让人以为没有历史
+refreshHistCount();
 </script>
 </body>
 </html>

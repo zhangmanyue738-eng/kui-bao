@@ -230,6 +230,13 @@ async function checkService() {
   hasClarify ? ok('服务', `127.0.0.1:${PORT}`, '已启动，前端含澄清闸 UI')
              : warn('服务', `127.0.0.1:${PORT}`, '已启动，但前端未发现澄清闸 UI（可能是旧版本在跑）', '重启服务加载最新 public/index.html');
 
+  // 历史档案 UI：服务读的是磁盘上的 public/index.html，进程是旧代码时页面就没有这个入口，
+  // 而它是攒 badcase 的唯一入口 —— 缺了会让人以为「没归档」，其实只是按钮没出来。
+  const hasHistory = /hist-drawer/.test(home.text) && /loadHistory|openSession/.test(home.text);
+  hasHistory ? ok('服务', '前端历史档案 UI', '已就位（抽屉 + 检索 + 打开）')
+             : warn('服务', '前端历史档案 UI', '页面里找不到历史档案入口 —— 长跑进程可能还在用旧前端',
+                 '重启服务：npm start');
+
   // 代码新鲜度：跑着的进程可能还是改代码之前启动的（本项目服务是长跑后台进程，很容易忘记重启）
   const citiesApi = await req(base + '/api/cities', {}, 5000);
   if (citiesApi.status === 200) {
@@ -475,6 +482,89 @@ function checkSmoke() {
 }
 
 // =====================================================================
+// 10. 会话归档（攒 badcase 的地方，坏了等于白攒）
+// =====================================================================
+const SESSIONS_FILE = path.join(ROOT, 'data', 'sessions.jsonl');
+
+function checkSessions() {
+  let sessions;
+  try { sessions = require('./sessions.js'); }
+  catch (e) { fail('会话归档', '模块加载', `require 失败：${e.message}`, '检查 src/sessions.js'); return; }
+
+  if (!fs.existsSync(SESSIONS_FILE)) {
+    // 全新环境还没跑过解读，文件不存在是正常的——但这必须是「因为没跑过」，
+    // 而不是因为建目录失败，所以要确认 data/ 可写。
+    try {
+      fs.mkdirSync(path.dirname(SESSIONS_FILE), { recursive: true });
+      ok('会话归档', '归档文件', `尚未创建（${SESSIONS_FILE}）—— 跑一次解读就会自动建，data/ 可写`);
+    } catch (e) {
+      fail('会话归档', '归档文件', `data/ 不可写：${e.message}`, '检查目录权限');
+    }
+    return;
+  }
+
+  let stats, listed;
+  try {
+    stats = sessions.stats();
+    listed = sessions.listSessions({ limit: 500 });
+  } catch (e) {
+    fail('会话归档', '读取', `读取失败：${e.message}`, 'sessions.jsonl 可能损坏，检查最近一次写入是否完整');
+    return;
+  }
+
+  // 坏行：readAll 不丢弃坏行，而是随 bad 数组返回——这里必须报出来，
+  // 否则坏行会在下次整体重写时被静默抹掉（数据丢失比报错更糟）。
+  stats.badLines > 0
+    ? fail('会话归档', '可解析性', `${stats.badLines} 行 JSON 解析失败`,
+        '手工修 data/sessions.jsonl 的坏行，或从备份恢复；不要直接整体重写（会丢这些行）')
+    : ok('会话归档', '可解析性', `${stats.total} 行全部可解析`);
+
+  // 规模与体积：JSONL 是全量重写模型，体积越大每次写入越慢、崩一半的风险越高
+  const mb = (stats.bytes / 1024 / 1024).toFixed(2);
+  const sizeLine = `${stats.total} 条 / ${mb} MB`;
+  stats.bytes > 50 * 1024 * 1024
+    ? warn('会话归档', '体积', sizeLine, '超过 50MB：定期导出备份后清理旧档案，避免每次写入都要重写整个大文件')
+    : ok('会话归档', '体积', sizeLine + (stats.total ? `（平均 ${Math.round(stats.bytes / stats.total / 1024)} KB/条）` : ''));
+
+  if (!stats.total) {
+    ok('会话归档', '评分分布', '暂无档案（跑一次解读后自动归档）');
+    return;
+  }
+
+  const g = stats.byRating.good || 0, b = stats.byRating.bad || 0;
+  const rate = Math.round((g + b) / stats.total * 100);
+  ok('会话归档', '评分分布',
+    `准 ${g} / 不准 ${b} / 未评 ${stats.total - g - b}（评价率 ${rate}%）· 带回真实事实 ${stats.withFacts} 条`);
+
+  // 已评价比例：攒了几十条却没人评价，等于攒了一堆没法用的样本
+  if (stats.total >= 10 && rate < 30) {
+    warn('会话归档', '评价率', `${rate}% —— 攒了 ${stats.total} 条却基本没评价`,
+      '开历史面板把看过的标一下，否则这些样本无法用来校正规则');
+  }
+
+  // 记录完整性：缺 chart / report 的档案打开就是空白页
+  const broken = listed.items.filter(it => !it.hasChart);
+  broken.length
+    ? warn('会话归档', '记录完整性', `${broken.length} 条缺少完整排盘（打开会是空白）：${broken.slice(0, 3).map(r => r.id).join('、')}`,
+        '这些多半是早期记录或手工写入；可直接删除，别留着污染检索')
+    : ok('会话归档', '记录完整性', `${stats.total} 条均含完整排盘`);
+
+  // 检索可用性冒烟：拿一条真实记录的特征去检索，命中才说明检索真能用。
+  // 只查「文件在不在」不够——字段抽错时文件在、但永远搜不到。
+  const probe = listed.items.find(it => it.index && it.index.dayMaster);
+  if (probe) {
+    try {
+      const hit = sessions.listSessions({ dayMaster: probe.index.dayMaster, limit: 500 });
+      hit.total > 0
+        ? ok('会话归档', '检索可用性', `按日主「${probe.index.dayMaster}」检索命中 ${hit.total} 条`)
+        : fail('会话归档', '检索可用性', `按日主「${probe.index.dayMaster}」检索应命中却为 0`, '检查 buildIndex 是否抽错字段');
+    } catch (e) {
+      fail('会话归档', '检索可用性', e.message, '检查 sessions.js listSessions');
+    }
+  }
+}
+
+// =====================================================================
 // 输出
 // =====================================================================
 const ICON = { ok: '✅', warn: '⚠️ ', fail: '❌', skip: '⏭️ ' };
@@ -526,6 +616,7 @@ async function main() {
   checkSect();
   checkPython();
   checkSmoke();
+  checkSessions();
   await checkLLM();
   await checkService();
 
