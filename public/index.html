@@ -167,7 +167,7 @@
   </div>
   <div class="drawer-body">
     <div class="hist-search">
-      <input type="text" id="hist-q" placeholder="搜索：备注 / 城市 / 日主 / 命宫主星 / 报告正文" onkeydown="if(event.key==='Enter')loadHistory()">
+      <input type="text" id="hist-q" placeholder="搜索：备注 / 城市 / 日主 / 命主 / 命宫主星 / 报告正文" onkeydown="if(event.key==='Enter')loadHistory()">
       <button class="mini-btn" onclick="loadHistory()">搜索</button>
     </div>
     <div class="hist-filters" id="hist-filters">
@@ -457,7 +457,11 @@ function renderResultBody(data, opts = {}) {
     html += `<div style="margin-top:14px" class="zx-row"><span>五行分布</span><span>${Object.entries(fe).map(([k,v])=>k+':'+v).join('　')}</span></div>`;
     if (!data.chart.ziwei.skipped) {
       const kp = data.chart.ziwei.keyPalaces;
-      html += `<h3 style="color:var(--accent);letter-spacing:4px;margin:18px 0 8px">紫微关键宫位（${esc(data.chart.ziwei.soul)} 命 · ${esc(data.chart.ziwei.fiveElementsClass)}）</h3>`;
+      // 命主 ≠ 命宫主星：命主按命宫地支查表得来（子贪狼、丑巨门…），命宫主星是命宫里坐的星。
+      // 以前这里把命主标成「X 命」，读者会当成命宫主星看。两个都给，名字写全。
+      const zwStars = (data.chart.ziwei.mingGongStars || []).join('、') || '空宫';
+      html += `<h3 style="color:var(--accent);letter-spacing:4px;margin:18px 0 8px">紫微关键宫位（${esc(data.chart.ziwei.fiveElementsClass)}）</h3>`;
+      html += `<p style="font-size:13px;color:var(--muted);margin-bottom:8px">命主：${esc(data.chart.ziwei.mingZhu || '-')} · 身主：${esc(data.chart.ziwei.shenZhu || '-')} · 命宫（${esc(data.chart.ziwei.mingGongBranch || '?')}）主星：${esc(zwStars)}</p>`;
       for (const [k, label] of [['ming','命宫'],['guanLu','官禄'],['caiBo','财帛'],['fuQi','夫妻'],['jiE','疾厄']]) {
         const pal = kp[k];
         if (!pal) continue;
@@ -561,7 +565,9 @@ function renderHistList(data) {
     const inp = it.input || {};
     const who = [inp.dateStr, inp.hour != null ? inp.hour + ' 时' : '时辰未定', inp.gender, inp.city].filter(Boolean).join(' · ');
     const idx = it.index || {};
-    const l2 = [idx.pillars, idx.dayMaster ? '日主 ' + idx.dayMaster : '', idx.mingStar ? '命宫 ' + idx.mingStar : '',
+    const mgStars = (idx.mingGongStars || []).join('、');
+    const l2 = [idx.pillars, idx.dayMaster ? '日主 ' + idx.dayMaster : '', idx.mingZhu ? '命主 ' + idx.mingZhu : '',
+      mgStars ? '命宫 ' + mgStars : '',
       idx.ziweiSkipped ? '紫微未排' : ''].filter(Boolean).join(' · ');
     return `<div class="hist-item" onclick="openSession('${esc(it.id)}')">
       <div class="l1"><span class="who">${esc(who || '未命名')}</span><span class="when">${esc(when)}</span></div>

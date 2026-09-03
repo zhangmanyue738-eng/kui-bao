@@ -198,6 +198,7 @@ async function route(req, res) {
           rating: params.get('rating') || '',
           dayMaster: params.get('dayMaster') || '',
           mingStar: params.get('mingStar') || '',
+          mingGongStar: params.get('mingGongStar') || '',
           from: params.get('from') || '',
           to: params.get('to') || '',
           limit: params.get('limit') || 50,

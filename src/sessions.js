@@ -87,8 +87,13 @@ function buildIndex(chart, synthesis) {
     dayMasterWx: b ? b.dayMaster.wuxing : null,
     pillars: b ? b.pillars : null,
     hourMissing: b ? !!b.hourPillarMissing : null,
-    mingStar: z && !z.skipped ? (z.soul || null) : null,
-    body: z && !z.skipped ? (z.body || null) : null,
+    // 命主（按命宫地支查表）与命宫内主星分开存：混在一起会让「按命宫主星找盘」检索到错的结果
+    mingZhu: z && !z.skipped ? (z.mingZhu || null) : null,
+    mingGongStars: z && !z.skipped ? (z.mingGongStars || []) : [],
+    shenZhu: z && !z.skipped ? (z.shenZhu || null) : null,
+    // 兼容旧档案的字段名：老记录里是 mingStar/body，语义其实是命主/身主
+    mingStar: z && !z.skipped ? (z.mingZhu || z.soul || null) : null,
+    body: z && !z.skipped ? (z.shenZhu || z.body || null) : null,
     fiveElementsClass: z && !z.skipped ? (z.fiveElementsClass || null) : null,
     ziweiSkipped: !!(z && z.skipped),
     // 领域结论摘要：复盘时最常按「哪个领域说了什么、给的可信度对不对」来找
@@ -147,7 +152,9 @@ function searchableText(r) {
     r.input && r.input.city,
     r.index && r.index.pillars && Object.values(r.index.pillars).join(' '),
     r.index && r.index.dayMaster,
+    r.index && r.index.mingZhu,
     r.index && r.index.mingStar,
+    r.index && r.index.mingGongStars && r.index.mingGongStars.join(' '),
     r.report,
   ];
   return parts.filter(Boolean).join('\n').toLowerCase();
@@ -162,14 +169,14 @@ function inRange(ts, from, to) {
 
 /**
  * 列表 + 检索
- * @param filter { q, rating, dayMaster, mingStar, from, to, limit, offset }
+ * @param filter { q, rating, dayMaster, mingStar, mingGongStar, from, to, limit, offset }
  *   q 全文（备注/反馈/事实/城市/四柱/命宫主星/报告正文）
  *   from/to ISO 日期或日期时间字符串
  * @returns { total, items, bad }
  *   items 是不含 report 正文与完整 chart 的摘要（列表页不需要，省流量）
  */
 function listSessions(filter = {}) {
-  const { q, rating, dayMaster, mingStar, from, to } = filter;
+  const { q, rating, dayMaster, mingStar, mingGongStar, from, to } = filter;
   const limit = Math.min(Number(filter.limit) || 50, 500);
   const offset = Number(filter.offset) || 0;
   const { records, bad } = readAll();
@@ -183,7 +190,10 @@ function listSessions(filter = {}) {
   }
   if (rating) hits = hits.filter(r => r.rating === rating);
   if (dayMaster) hits = hits.filter(r => r.index && r.index.dayMaster === dayMaster);
+  // mingStar 语义是命主；另给 mingGongStar 按命宫主星筛（命宫内可能多颗星，命中任一颗即可）
   if (mingStar) hits = hits.filter(r => r.index && r.index.mingStar === mingStar);
+  if (mingGongStar) hits = hits.filter(r => r.index
+    && (r.index.mingGongStars || []).includes(mingGongStar));
   if (from || to) hits = hits.filter(r => inRange(r.ts, from, to));
 
   const total = hits.length;
@@ -293,7 +303,7 @@ if (require.main === module) {
 
   // 索引是否抽对
   console.log(`\n── 索引抽取`);
-  console.log(`   A: 日主=${a.index.dayMaster}(${a.index.dayMasterWx}) 命宫主星=${a.index.mingStar} 四柱=${JSON.stringify(a.index.pillars)}`);
+  console.log(`   A: 日主=${a.index.dayMaster}(${a.index.dayMasterWx}) 命主=${a.index.mingZhu} 命宫主星=${(a.index.mingGongStars || []).join('、') || '空宫'} 四柱=${JSON.stringify(a.index.pillars)}`);
   console.log(`   B: 日主=${b.index.dayMaster} 时辰未知=${b.index.hourMissing} 紫微跳过=${b.index.ziweiSkipped}`);
   console.log(`   领域摘要 A: ${a.index.domains.map(d => `${d.domain}:${d.direction}/${d.confidence}`).join(' ')}`);
 
@@ -303,8 +313,15 @@ if (require.main === module) {
   console.log(`   全文"深圳" → ${r1.total} 条`);
   const r2 = listSessions({ dayMaster: a.index.dayMaster });
   console.log(`   日主=${a.index.dayMaster} → ${r2.total} 条`);
-  const r3 = listSessions({ mingStar: a.index.mingStar });
-  console.log(`   命宫主星=${a.index.mingStar} → ${r3.total} 条`);
+  const r3 = listSessions({ mingStar: a.index.mingZhu });
+  console.log(`   命主=${a.index.mingZhu} → ${r3.total} 条`);
+  // 命宫主星与命主是两回事，两个检索维度都要能命中，否则说明字段又串了
+  const mg = (a.index.mingGongStars || [])[0];
+  const r4 = listSessions({ mingGongStar: mg });
+  console.log(`   命宫主星=${mg} → ${r4.total} 条`);
+  if (a.index.mingZhu === mg) {
+    console.log(`   ⚠️ 命主与命宫主星同名（${mg}），本用例区分不了两者 —— 换一个生辰再测`);
+  }
 
   // 更新（含白名单校验）
   console.log(`\n── 更新与白名单`);

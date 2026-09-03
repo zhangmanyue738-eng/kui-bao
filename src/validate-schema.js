@@ -99,19 +99,43 @@ function checkFile(file) {
   return false;
 }
 
+// ───────── 样例定义：样例由这里生成，不由人手写 ─────────
+// 排盘层一改字段，旧样例就与新 schema 不符；所以样例必须能一键重生成，
+// 否则「样例失败」这件事会被手工改 JSON 掩盖过去，等于放弃回归。
+const SAMPLE_INPUTS = [
+  { dateStr: '2000-8-16', hour: 14, gender: '男', city: '深圳', slug: 'shenzhen' },
+  // 佳木斯 130.35°E → 真太阳时 +41 分钟，23 时校正后仍在 23 时，正好触发子时三档口径分歧。
+  // 用北京（114°E 附近）会被校正到亥时，口径差异被掩盖 —— 这是踩过的坑
+  { dateStr: '2000-8-16', hour: 23, gender: '男', city: '佳木斯', slug: 'jiamusi' },
+  { dateStr: '1995-6-15', hour: null, gender: '女', city: '杭州', slug: 'hangzhou' },   // 时辰未知降级
+];
+
+function regenSamples() {
+  const samplesDir = path.join(__dirname, '..', 'samples');
+  fs.mkdirSync(samplesDir, { recursive: true });
+  for (const inp of SAMPLE_INPUTS) {
+    const chart = buildChart(inp);
+    const name = `sample-${inp.dateStr}-${inp.hour == null ? 'null' : inp.hour}-`
+      + `${inp.gender === '男' ? 'm' : 'f'}-${inp.slug}.json`;
+    fs.writeFileSync(path.join(samplesDir, name), JSON.stringify(chart, null, 2));
+    console.log(`🔄 重生成 ${name}`);
+  }
+}
+
 // 主流程
-const args = process.argv.slice(2);
+const args = process.argv.slice(2).filter(a => a !== '--regen');
+const REGEN = process.argv.includes('--regen');
 let allOk = true;
+if (REGEN) {
+  regenSamples();
+  console.log('');
+}
 if (args.length) {
   for (const f of args) allOk = checkFile(f) && allOk;
 } else {
   const samplesDir = path.join(__dirname, '..', 'samples');
+  // 样例文件由 --regen 生成，这里只负责校验（含上面 SAMPLE_INPUTS 里定义的每一份）
   const files = fs.readdirSync(samplesDir).filter(f => f.endsWith('.json')).map(f => path.join(samplesDir, f));
-  // 额外生成时辰未知 + 女命样例
-  const extra = buildChart({ dateStr: '1995-6-15', hour: null, gender: '女', city: '杭州' });
-  const extraPath = path.join(samplesDir, 'sample-1995-6-15-null-f-hangzhou.json');
-  fs.writeFileSync(extraPath, JSON.stringify(extra, null, 2));
-  files.push(extraPath);
   for (const f of files) allOk = checkFile(f) && allOk;
 }
 process.exit(allOk ? 0 : 1);
