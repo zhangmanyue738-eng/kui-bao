@@ -312,6 +312,56 @@ function buildBazi(dateStr, hourOrNull, gender, sect = {}) {
   };
 }
 
+// ---------- 紫微 · 流年四化 ----------
+/**
+ * 流年四化的落点。只做四化，**不做流曜**——
+ * 流曜（流禄/流羊/流马/流魁…）在 knowledge/ 里是 **0 条**依据，
+ * 没有古籍支撑的规则不许进报告（铁律：解读必带古籍出处）。
+ * 四化则有《骨髓赋·四化星论》可依：化禄主财主缘 / 化权主决断 / 化科主名主贵人 / 化忌主煞主功课。
+ *
+ * 同时只取 yearly，不取 monthly/daily/hourly —— 节奏判断粒度只到年/季度（红线）。
+ *
+ * 两个易错点（都已实测确认）：
+ *  ① **本命四化 ≠ 流年四化**。星曜对象上的 `mutagen` 字段是**生年干**四化；
+ *     流年四化由**流年干**决定，必须从 `horoscope().yearly.mutagen` 取。
+ *     实测同一颗天同：本命为「忌」、2026 流年为「禄」——混用就全反了。
+ *  ② **宫位映射**。yearly.palaceNames[i] 的含义是「本命第 i 宫在流年盘里叫什么宫」。
+ *     不是流年第 i 宫。搞反则四化全部落错宫。
+ *
+ * @returns {{ ganzhi, flowDate, byFlowPalace: Record<string,{star,mutagen,natalPalace}[]> }}
+ */
+function buildAnnualMutagen(ast, flowDate = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  const ds = `${flowDate.getFullYear()}-${pad(flowDate.getMonth() + 1)}-${pad(flowDate.getDate())}`;
+  let horo;
+  try {
+    horo = ast.horoscope(ds);
+  } catch (e) {
+    return { ganzhi: null, flowDate: ds, byFlowPalace: {}, error: `horoscope 失败：${e.message}` };
+  }
+  const y = horo.yearly;
+  const MUT = ['禄', '权', '科', '忌'];        // yearly.mutagen 顺序固定为 禄权科忌
+  const byFlowPalace = {};
+
+  (y.mutagen || []).forEach((starName, k) => {
+    if (!starName) return;
+    // 这颗星在本命盘的第几宫
+    const idx = ast.palaces.findIndex(p =>
+      [...p.majorStars, ...p.minorStars].some(s => s.name === starName));
+    if (idx < 0) return;
+    const flowPalace = y.palaceNames[idx];      // 本命第 idx 宫 → 流年宫名
+    (byFlowPalace[flowPalace] = byFlowPalace[flowPalace] || []).push({
+      star: starName, mutagen: MUT[k], natalPalace: ast.palaces[idx].name,
+    });
+  });
+
+  return {
+    ganzhi: `${y.heavenlyStem}${y.earthlyBranch}`,
+    flowDate: ds,
+    byFlowPalace,
+  };
+}
+
 // ---------- 紫微 ----------
 // 注：紫微命宫由「生月 + 生时地支」定位，子时早/晚地支同为子，
 // 故命宫与五行局在三档口径下一致；此处传不同 index 仅为口径自洽与可审计。
@@ -345,6 +395,9 @@ function buildZiwei(dateStr, hour, gender, sect = {}) {
   const ming = pick('命宫');
   const mingPalace = ast.palaces.find(p => p.name === '命宫');   // 取命宫地支要用 iztro 原对象
   return {
+    // 嵌套而非展开：展开会让 ganzhi/flowDate 直接挂在 ziwei 上，
+    // 而 ziwei.ganzhi 容易被误读成「紫微盘的干支」，其实是流年干支。
+    annualMutagen: buildAnnualMutagen(ast),
     // 保留 iztro 原字段名仅为向后兼容（verify-chart 对拍在用），新代码不要用
     soul: ast.soul, body: ast.body,
     mingZhu: ast.soul,                                  // 命主（按命宫地支查表）

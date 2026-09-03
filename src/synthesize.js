@@ -9,6 +9,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { Lunar } = require('lunar-javascript');
 
 // ───────── 五行生克表 ─────────
 const SHENG = { 木: '火', 火: '土', 土: '金', 金: '水', 水: '木' }; // 我生
@@ -255,9 +256,7 @@ function baziHealthSignal(bazi) {
 }
 
 function baziAnnualSignal(bazi, fe) {
-  // 2026 流年丙午（立春后）——MVP 固定当年，后续改为参数
-  const year = new Date().getFullYear();
-  const ganzhi = bazi.daYun.length ? annualGanzhi(year) : null;
+  const ganzhi = bazi.daYun.length ? currentYearGanzhi(new Date()) : null;
   const evidence = [];
   if (!ganzhi) return { direction: 'neutral', strength: 0.2, evidence: ['流年未排'], conditions: [] };
   // 流年天干十神（相对日主）——lunar 未直接给，用日主推
@@ -273,11 +272,21 @@ function baziAnnualSignal(bazi, fe) {
   return { direction: 'neutral', strength: 0.3, evidence, conditions };
 }
 
-// 流年干支计算（MVP：标准年干支公式，立春边界误差 <1 天可接受，2 月 4 日后生效）
-function annualGanzhi(year) {
-  const GAN = '甲乙丙丁戊己庚辛壬癸', ZHI = '子丑寅卯辰巳午未申酉戌亥';
-  const gan = GAN[(year - 4) % 10], zhi = ZHI[(year - 4) % 12];
-  return gan + zhi;
+/**
+ * 当前流年干支 —— **必须以立春分界，不能用公历年公式**。
+ *
+ * 踩过的坑：原实现是 `(year - 4) % 10 / % 12`，按公历年算。
+ * 而八字流年的分界是**立春**，不是 1 月 1 日 —— 于是每年 1/1 ~ 立春前
+ * 这段时间会整整差一年（实测 2027-01-20：公式给「丁未」，正确是「丙午」）。
+ * 流年干支错了，十神归类跟着错，流年吉凶方向可能完全反。
+ *
+ * 项目里本来就有 lunar-javascript（排盘就靠它），直接取它的精确年干支即可，
+ * 没必要自己维护公式。
+ */
+function currentYearGanzhi(date = new Date()) {
+  const l = Lunar.fromDate(date);
+  // getYearInGanZhiExact：按立春分界（getYearInGanZhi 按正月初一分界，八字不用那个）
+  return l.getYearInGanZhiExact ? l.getYearInGanZhiExact() : l.getYearInGanZhi();
 }
 function ganzhiGanWx(gz) { return { 甲: '木', 乙: '木', 丙: '火', 丁: '火', 戊: '土', 己: '土', 庚: '金', 辛: '金', 壬: '水', 癸: '水' }[gz[0]]; }
 function flowGroupOf(dmWx, flowWx) {
@@ -309,8 +318,36 @@ function ziweiHealthSignal(zw) {
   if (s.direction === 'unfavorable') s.strength = Math.min(s.strength, 0.5);
   return s;
 }
+/**
+ * 紫微侧流年信号 —— 依据 KB-009《骨髓赋》四化星论：
+ *   「化禄入命，财源广进；化权入命，能担大任；化科入命，名声远播；化忌入命，须经磨炼方能成器。」
+ *
+ * 设计约束（写死，防止后人好心扩展成无据规则）：
+ * 1. 流年四化固定禄权科忌各一颗，数个数无信息量，方向只由**落宫**决定；
+ * 2. 只有「入流年命宫」在 KB-009 有明文，其余落宫一律 neutral、只记证据不解读；
+ * 3. 流曜（流喜/流禄/流马…）知识库 0 条依据，**永不接入**；
+ * 4. 落点计算在排盘层（chart.js buildAnnualMutagen），本函数只消费，不算盘。
+ */
 function ziweiAnnualSignal(zw) {
-  return { direction: 'neutral', strength: 0, evidence: ['流曜/流四化未排（MVP），紫微侧流年信号暂缺'], conditions: [] };
+  const am = zw.annualMutagen;
+  if (!am || am.error) {
+    return { direction: 'neutral', strength: 0.2,
+      evidence: ['流年四化不可用' + (am && am.error ? `（${am.error}）` : '')], conditions: [] };
+  }
+  const MUT = { 禄: '化禄', 权: '化权', 科: '化科', 忌: '化忌' };
+  const entries = Object.entries(am.byFlowPalace || {}).flatMap(([pal, arr]) =>
+    (arr || []).map(x => `${x.star}${MUT[x.mutagen]}入流年${pal}宫（本命${x.natalPalace}宫）`));
+  const inMing = Object.entries(am.byFlowPalace || {}).flatMap(([pal, arr]) =>
+    (arr || []).filter(x => pal === '命宫').map(x => x.mutagen));
+  const conditions = [`流年${am.ganzhi}（基准日 ${am.flowDate}）`];
+  // KB-009 入命规则：禄/权/科入命吉，忌入命须磨炼
+  if (inMing.includes('忌')) {
+    return { direction: 'unfavorable', strength: 0.7, evidence: [...entries, '化忌入流年命宫（KB-009：须经磨炼）'], conditions };
+  }
+  if (inMing.some(m => m !== '忌')) {
+    return { direction: 'favorable', strength: 0.6, evidence: [...entries, `${inMing.map(m => MUT[m]).join('/')}入流年命宫（KB-009：入命吉）`], conditions };
+  }
+  return { direction: 'neutral', strength: 0.4, evidence: entries.length ? entries : ['流年四化无入命者'], conditions };
 }
 
 // ───────── 合成 ─────────
@@ -379,7 +416,10 @@ function synthesize(chart, domains) {
   return { favorableElements: fe, results, warnings: fe.warnings || [] };
 }
 
-module.exports = { synthesize, favorableElements };
+// currentYearGanzhi 一并导出：它接受日期参数，doctor 才能拿固定日期去测立春边界。
+// 不导出的话，这个「只在每年 1/1~立春前发作」的 bug 就没有测试守得住——
+// 题库同样覆盖不到（答案在跑题当天生成，而当天几乎不会落在那一个月的窗口里）。
+module.exports = { synthesize, favorableElements, currentYearGanzhi };
 
 if (require.main === module) {
   const { buildChart } = require('./chart.js');

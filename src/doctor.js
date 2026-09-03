@@ -440,6 +440,98 @@ function checkSect() {
   else fail('流派口径', '子时三档有效性', `三档结果未分离（${outs.join(' / ')}），参数可能没生效`, '检查 chart.js resolveZishi');
 }
 
+/**
+ * 流年干支的立春分界。
+ *
+ * 为什么需要单独一组检查：这条逻辑依赖「当前日期」，而题库是在跑题当天生成的——
+ * 只要当天不落在 1/1~立春这个窗口里，题库就**永远发现不了**它算错。
+ * 实测踩过：原实现用 `(year-4)%10` 按公历年算，每年 1/1~立春前整整差一年
+ * （2027-01-20 给「丁未」，正确是「丙午」）。
+ * 所以这里全部用固定日期去测，且断言只表达语义、不硬编码任何具体干支值。
+ */
+function checkAnnual() {
+  let cyg;
+  try {
+    ({ currentYearGanzhi: cyg } = require(path.join(ROOT, 'src', 'synthesize.js')));
+  } catch (e) {
+    fail('流年', '模块可加载', `require 失败：${e.message}`, '检查 src/synthesize.js 语法');
+    return;
+  }
+  if (typeof cyg !== 'function') {
+    fail('流年', '接口', 'synthesize.js 未导出 currentYearGanzhi', '不导出就没法用固定日期测立春边界');
+    return;
+  }
+
+  const at = (y, m, d) => new Date(y, m - 1, d, 12, 0, 0);
+  const problems = [];
+  const notes = [];
+
+  for (const y of [2026, 2027, 2030]) {
+    // ① 1 月中旬必须还属于**上一**干支年（立春分界的直接后果，也是抓「退化成公历年公式」的主断言）
+    const jan = cyg(at(y, 1, 15));
+    const prevMid = cyg(at(y - 1, 7, 1));
+    if (jan !== prevMid) {
+      problems.push(`${y}-01-15 得 ${jan}，但 1 月应仍属上一干支年（${y - 1} 年中为 ${prevMid}）`);
+    }
+
+    // ② 立春当天必须切换，且切换后与当年年中一致
+    let lcStr;
+    try {
+      const { Lunar } = require('lunar-javascript');
+      lcStr = Lunar.fromDate(at(y, 7, 1)).getJieQiTable()['立春'];
+    } catch (e) { problems.push(`${y} 取立春失败：${e.message}`); continue; }
+    if (!lcStr) { problems.push(`${y} 节气表无立春`); continue; }
+
+    const [ly, lm, ld] = String(lcStr).split('-').map(Number);
+    const lc = at(ly, lm, ld);
+    const dayBefore = cyg(new Date(lc.getTime() - 86400000));
+    const onDay = cyg(lc);
+    const midYear = cyg(at(y, 7, 1));
+
+    if (dayBefore === onDay) problems.push(`${y} 立春（${lcStr}）前后干支未切换，分界没生效`);
+    if (onDay !== midYear) problems.push(`${y} 立春当天 ${onDay} 与当年年中 ${midYear} 不一致`);
+    if (dayBefore !== prevMid) problems.push(`${y} 立春前一日 ${dayBefore} 应同上一干支年 ${prevMid}`);
+    notes.push(`${y} 立春 ${lcStr}: ${dayBefore}→${onDay}`);
+  }
+
+  // ③ 干支本身必须是合法 60 甲子（天干地支阴阳须同配）
+  const GAN = '甲乙丙丁戊己庚辛壬癸', ZHI = '子丑寅卯辰巳午未申酉戌亥';
+  for (let i = 0; i < 24; i++) {
+    const y = 2026, m = (i % 12) + 1;
+    const gz = cyg(at(y, m, 15));
+    const gi = GAN.indexOf(gz[0]), zi = ZHI.indexOf(gz[1]);
+    if (gi < 0 || zi < 0 || (gi % 2) !== (zi % 2)) {
+      problems.push(`${y}-${m}-15 产出非法干支「${gz}」`);
+    }
+  }
+
+  problems.length
+    ? fail('流年', '立春分界', problems.slice(0, 3).join('；'), '流年干支必须以立春分界，不能用公历年公式 (year-4)%10')
+    : ok('流年', '立春分界', notes.join(' · '));
+
+  // ④ 紫微流年四化冒烟：annualMutagen 依赖 iztro horoscope()，API 一旦升级变结构会静默产出 error。
+  //    这里锁三件事：能算出干支、四化齐（禄权科忌各一）、无 error 字段。
+  try {
+    const { buildChart } = require(path.join(ROOT, 'src', 'chart.js'));
+    const c = buildChart({ dateStr: '2000-8-16', hour: 14, gender: '男', city: '深圳' });
+    const am = c.ziwei && c.ziwei.annualMutagen;
+    if (!am) fail('流年', '紫微四化冒烟', 'ziwei.annualMutagen 不存在', 'chart.js 的 buildAnnualMutagen 未挂载');
+    else if (am.error) fail('流年', '紫微四化冒烟', `产出 error：${am.error}`, 'iztro horoscope() 可能升级改了结构');
+    else {
+      const flats = Object.values(am.byFlowPalace || {}).flat();
+      const muts = flats.map(x => x.mutagen).sort().join('');
+      const gzOk = am.ganzhi && am.ganzhi.length === 2;
+      if (!gzOk || muts !== '忌权禄科') {
+        fail('流年', '紫微四化冒烟', `ganzhi=${am.ganzhi} 四化=[${muts}]`, '应为干支 2 字 + 禄权科忌各一颗');
+      } else {
+        ok('流年', '紫微四化冒烟', `${am.ganzhi} 年四化齐备，落 ${Object.keys(am.byFlowPalace).join('/')} 宫`);
+      }
+    }
+  } catch (e) {
+    fail('流年', '紫微四化冒烟', `执行失败：${e.message}`, '检查 chart.js buildAnnualMutagen');
+  }
+}
+
 // =====================================================================
 // 8. Python 侧（跨实现对拍依赖）
 // =====================================================================
@@ -842,6 +934,7 @@ async function main() {
   checkKnowledge();
   checkCities();
   checkSect();
+  checkAnnual();
   checkPython();
   checkSmoke();
   checkSessions();
