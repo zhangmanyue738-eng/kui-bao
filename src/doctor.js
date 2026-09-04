@@ -350,14 +350,24 @@ function checkKnowledge() {
     ok('知识库', '出处命名', '无拼音文件名混入出处');
   }
 
-  // 与 knowledge/ 源文件是否同步
-  const src = newestMtimeUnder(path.join(ROOT, 'knowledge'), ['.md', '.json', '.txt']);
-  const kbMt = fs.statSync(kbPath).mtimeMs;
-  if (src.mtime && src.mtime > kbMt) {
-    warn('知识库', '与 knowledge/ 同步',
-      `源文件 ${path.relative(ROOT, src.file)} 更新于知识库之后`, 'npm run kb');
-  } else if (src.mtime) {
-    ok('知识库', '与 knowledge/ 同步', '知识库不早于源文件');
+  // 与 knowledge/ 源文件是否同步：用 build-kb 落盘的消费清单（kb-build-meta.json）
+  // 精确比对——老版全目录扫 mtime，改个 README 都误报「知识库过期」（假警告消耗信任）。
+  const metaPath = path.join(ROOT, 'data', 'kb-build-meta.json');
+  const meta = readJSON(metaPath);
+  if (!meta || !meta.files || !Object.keys(meta.files).length) {
+    warn('知识库', '与 knowledge/ 同步', '缺 kb-build-meta.json（旧版构建产物）', 'npm run kb 重建后生成');
+  } else {
+    const stale = Object.entries(meta.files)
+      .filter(([rel, mt]) => {
+        const abs = path.join(ROOT, rel);
+        return !fs.existsSync(abs) || fs.statSync(abs).mtimeMs !== mt;
+      })
+      .map(([rel]) => rel);
+    if (stale.length) {
+      warn('知识库', '与 knowledge/ 同步', `${stale.length} 个消费过的源文件有更新：${stale.slice(0, 3).join('、')}`, 'npm run kb');
+    } else {
+      ok('知识库', '与 knowledge/ 同步', `消费清单 ${Object.keys(meta.files).length} 个文件全部同步`);
+    }
   }
 
   // 调候表（穷通宝鉴）：结构是「10 天干 × 12 月」两层嵌套，要数叶子节点

@@ -16,6 +16,16 @@ const OUT = path.join(ROOT, 'data', 'kb.jsonl');
 const entries = [];
 let seq = 0;
 const nid = () => 'KB-' + String(++seq).padStart(3, '0');
+
+// 实际消费的源文件清单（含 mtime），构建后写 data/kb-build-meta.json。
+// doctor 据此做新鲜度检查——只查真正参与构建的文件，
+// 避免「改了 README/NOTICE 就误报知识库过期」的假警告（mtime 全目录扫描的老毛病）。
+const consumed = {};
+function readSrc(p) {
+  const raw = fs.readFileSync(p, 'utf8');
+  try { consumed[path.relative(ROOT, p)] = fs.statSync(p).mtimeMs; } catch { /* ignore */ }
+  return raw;
+}
 const push = (source, tradition, license, text) => {
   text = (text || '').trim();
   if (text.length < 25) return;
@@ -27,7 +37,7 @@ function extractZiweiClassics() {
   const dir = path.join(ZIWEI_REPO, 'lib', 'classics', 'data');
   if (!fs.existsSync(dir)) return;
   for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.ts'))) {
-    const raw = fs.readFileSync(path.join(dir, f), 'utf8');
+    const raw = readSrc(path.join(dir, f));
     const bookTitle = (raw.match(/title:\s*'([^']+)'/) || [])[1] || f;
     const chapterRe = /title:\s*'([^']+)'[\s\S]*?paragraphs:\s*\[([\s\S]*?)\n\s*\]/g;
     let m;
@@ -50,7 +60,7 @@ function extractZiweiClassics() {
 function extractZiweiPatterns() {
   const p = path.join(ZIWEI_REPO, 'lib', 'ziwei', 'patterns.ts');
   if (!fs.existsSync(p)) return;
-  const raw = fs.readFileSync(p, 'utf8');
+  const raw = readSrc(p);
   const re = /name:\s*'([^']+)',[^{}]*?level:\s*'([^']+)'[^{}]*?description:\s*'((?:[^'\\]|\\.)*)'/g;
   let m;
   while ((m = re.exec(raw)) !== null) {
@@ -70,7 +80,7 @@ function extractNihai() {
   for (const f of ['tianji.ts', 'renji.ts', 'diji.ts']) {
     const p = path.join(dir, f);
     if (!fs.existsSync(p)) continue;
-    const raw = fs.readFileSync(p, 'utf8');
+    const raw = readSrc(p);
     const modRe = /name:\s*'([^']+)',[^{}]*?description:\s*'((?:[^'\\]|\\.)*)'([\s\S]*?)(?=\n\s*\{\n\s*id:|\n\s*\];|$)/g;
     let m;
     while ((m = modRe.exec(raw)) !== null) {
@@ -132,7 +142,7 @@ function extractBaziMarkdown() {
   for (const f of fs.readdirSync(BAZI_DIR).filter(f => f.endsWith('.md'))) {
     const key = f.replace(/\.md$/, '');
     const meta = BAZI_FILE_MAP[key] || unregistered(key);
-    const raw = fs.readFileSync(path.join(BAZI_DIR, f), 'utf8');
+    const raw = readSrc(path.join(BAZI_DIR, f));
     // 按 ## 或 ### 切分（粒度更细，检索更准）
     const sections = raw.split(/^#{2,3}\s+/m).slice(1);
     // 日干：用于调候表条目的天干补全（从 ## 标题如「甲木调候」取）
@@ -216,6 +226,8 @@ extractBaziMarkdown();
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, entries.map(e => JSON.stringify(e)).join('\n') + '\n');
+fs.writeFileSync(path.join(ROOT, 'data', 'kb-build-meta.json'),
+  JSON.stringify({ builtAt: Date.now(), files: consumed }, null, 2) + '\n');
 
 // 统计
 const stat = { tradition: {}, license: {} };
