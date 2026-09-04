@@ -250,6 +250,16 @@ bench 报告里标 ⚠️「未兜底」的题型正确率低才是真实风险�
     而 QA 只查禁词不查依据（实测一次样本没输出，属许可性风险非现行违规）。
     修法：流年收口到「只允许全年方向、依据给什么只能说什么」；
     开放新粒度的前置条件 = 计算层接入 + KB 有条文，二者缺一不开
+29. **knowledge/ 下的子目录未必是「自己的资产」——先查引用关系再谈版权**：
+    `knowledge/ziwei-doushu` 一直是第三方项目（Renhuai123/ziwei-doushu，MIT）的整体 clone
+    （Next.js 应用 + 数据），本项目实际只用 3 个数据文件（lib/classics/data/*.ts、
+    lib/ziwei/patterns.ts、lib/nihai/*.ts）。开源前已瘦身至 10 个文件（736K→约 300K），
+    kb 重建 md5 零漂移（91414ede）验证未伤数据。教训：**瘦身前后必须各跑一次 build-kb 对 md5**。
+30. **git push 报 SSL_ERROR_SYSCALL 可能是「假失败」**：连接断了但数据可能已送达——
+    重试显示 Everything up-to-date 时，先 curl GitHub API 核对远端 commit hash 再判断，别盲目强推。
+31. **公版模式已实现**：`KB_PUBLIC_ONLY=1` → interpret 检索传 `{publicOnly:true}`（retrieve 原生支持），
+    只用 48 条公版古籍。注意公版模式下条文池变小，检索条数可能少于 k（实测 7/10），解读会更薄——
+    这是诚实的代价，别为凑数把 modern 混回去
 
 ## 检索质量量化（2026-09-03，Task #31）
 
