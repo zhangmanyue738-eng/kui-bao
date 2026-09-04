@@ -1,0 +1,72 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="85%">
+      <stop offset="0%" stop-color="#1c2333"/>
+      <stop offset="55%" stop-color="#12182a"/>
+      <stop offset="100%" stop-color="#0a0f1c"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e8c97a"/>
+      <stop offset="100%" stop-color="#c99a3f"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#5fd4c4"/>
+      <stop offset="100%" stop-color="#3aa8c9"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="18" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- 星点 -->
+  <g fill="#8fa3c8" opacity="0.5">
+    <circle cx="120" cy="90" r="1.6"/><circle cx="340" cy="60" r="1.2"/><circle cx="560" cy="110" r="1.8"/>
+    <circle cx="900" cy="70" r="1.3"/><circle cx="1120" cy="120" r="1.7"/><circle cx="1220" cy="60" r="1.2"/>
+    <circle cx="80" cy="520" r="1.5"/><circle cx="260" cy="580" r="1.2"/><circle cx="1010" cy="560" r="1.6"/>
+    <circle cx="1190" cy="500" r="1.2"/><circle cx="640" cy="40" r="1.4"/><circle cx="450" cy="590" r="1.3"/>
+  </g>
+
+  <!-- 双管窥豹：两个望远镜圆环交叠，中心豹眼 -->
+  <g transform="translate(640,208)">
+    <circle cx="-52" cy="0" r="86" fill="none" stroke="url(#teal)" stroke-width="7" opacity="0.85" filter="url(#glow)"/>
+    <circle cx="52" cy="0" r="86" fill="none" stroke="url(#gold)" stroke-width="7" opacity="0.85" filter="url(#glow)"/>
+    <circle cx="0" cy="0" r="30" fill="#e8c97a" filter="url(#glow)"/>
+    <ellipse cx="0" cy="0" rx="12" ry="26" fill="#0a0f1c"/>
+    <circle cx="-14" cy="-8" r="4.5" fill="#fff" opacity="0.9"/>
+  </g>
+
+  <!-- 主标题 -->
+  <text x="640" y="388" text-anchor="middle" font-family="PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif"
+        font-size="92" font-weight="700" fill="url(#gold)" letter-spacing="14">窥豹 KuiBao</text>
+
+  <!-- 副标题 -->
+  <text x="640" y="446" text-anchor="middle" font-family="PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif"
+        font-size="30" fill="#c7d3ea" letter-spacing="4">双术互证命理顾问 · 八字 × 紫微斗数</text>
+
+  <!-- 格言 -->
+  <text x="640" y="492" text-anchor="middle" font-family="PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif"
+        font-size="22" fill="#7484a8" letter-spacing="2">一管窥豹，只见一斑；两管并窥，其形自现。</text>
+
+  <!-- 四个特性胶囊 -->
+  <g font-family="PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="21" text-anchor="middle">
+    <g>
+      <rect x="152" y="536" width="216" height="52" rx="26" fill="#18233c" stroke="#3aa8c9" stroke-width="1.5"/>
+      <text x="260" y="570" fill="#5fd4c4">排盘零幻觉</text>
+    </g>
+    <g>
+      <rect x="400" y="536" width="216" height="52" rx="26" fill="#18233c" stroke="#c99a3f" stroke-width="1.5"/>
+      <text x="508" y="570" fill="#e8c97a">古籍出处可查</text>
+    </g>
+    <g>
+      <rect x="648" y="536" width="216" height="52" rx="26" fill="#18233c" stroke="#3aa8c9" stroke-width="1.5"/>
+      <text x="756" y="570" fill="#5fd4c4">双术交叉互证</text>
+    </g>
+    <g>
+      <rect x="896" y="536" width="216" height="52" rx="26" fill="#18233c" stroke="#c99a3f" stroke-width="1.5"/>
+      <text x="1004" y="570" fill="#e8c97a">AI 不排盘</text>
+    </g>
+  </g>
+</svg>
