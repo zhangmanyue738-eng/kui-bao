@@ -221,8 +221,9 @@ async function interpret({ chart, domains, synthesis, model: modelOverride }) {
   const domainText = domainList.map(d => DOMAIN_NAMES[d] || d).join('、');
   const slim = slimChart(chart);
 
-  // RAG 检索
-  const passages = retrieveBalanced(slim, domainList, 10);
+  // RAG 检索。KB_PUBLIC_ONLY=1 → 只用公版古籍条目（对外发布模式，剔除现代整理与讲义内容）
+  const publicOnly = process.env.KB_PUBLIC_ONLY === '1';
+  const passages = retrieveBalanced(slim, domainList, 10, { publicOnly });
   const passageBlock = passages.length
     ? '知识库检索条文（引用只能出自以下列表）：\n' +
       passages.map(p => `[${p.id}] ${p.source}：${p.text}`).join('\n\n')
